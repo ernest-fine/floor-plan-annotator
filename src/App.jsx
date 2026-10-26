@@ -38,7 +38,7 @@ export default function App() {
     [selectedId, setSelectedId] = useState(null);
   const [tool, setTool] = useState("select"),
     [color, setColor] = useState("#d8322a"),
-    [size, setSize] = useState(3.2),
+    [size, setSize] = useState(2.6),
     [zoom, setZoom] = useState(1),
     [includeTable, setIncludeTable] = useState(true),
     [busy, setBusy] = useState(false);
