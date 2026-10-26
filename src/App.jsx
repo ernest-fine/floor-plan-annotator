@@ -10,7 +10,7 @@ import {
 import useProject from "./hooks/useProject.js";
 import { projectFromFile, projectFromImage } from "./lib/files.js";
 import { download, exportCsv, exportPng, fileBase } from "./lib/exports.js";
-import { TOOL_NAMES } from "./lib/model.js";
+import { enteredGateways, TOOL_NAMES } from "./lib/model.js";
 
 export default function App() {
   const [notice, setNotice] = useState(null);
@@ -361,6 +361,7 @@ export default function App() {
       <aside className="chrome">
         <AnnotationDetails
           item={item}
+          gatewayNames={enteredGateways(project.items)}
           open={panel === "details"}
           onUpdate={updateItem}
           onDelete={removeSelected}

@@ -43,6 +43,17 @@ export const emptyProject = () => ({
 });
 export const blankReading = () => ({ gateway: "", rssi: "", snr: "" });
 
+export function enteredGateways(items) {
+  return [
+    ...new Set(
+      items
+        .filter((item) => item.type === "point")
+        .flatMap((item) => item.readings.map((row) => row.gateway.trim()))
+        .filter(Boolean),
+    ),
+  ];
+}
+
 export function describe(item) {
   return item.type === "point"
     ? `Point ${item.number}: ${item.name || "Unnamed point"}`

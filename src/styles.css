@@ -356,10 +356,32 @@ small,
 .panel-heading > div {
   min-width: 0;
 }
-.close-panel {
-  min-height: 40px;
+.panel-heading button {
+  min-height: 44px;
+  height: 44px;
+  width: 64px;
+  min-width: 64px;
+  flex-shrink: 0;
   font-size: 12px;
-  padding: 6px 10px;
+  padding: 8px 10px;
+}
+.gateway-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.gateway-pill {
+  max-width: 100%;
+  min-height: 44px;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--green);
+  background: var(--green-soft);
+  border-color: #c7dfcf;
+  overflow-wrap: anywhere;
+  text-align: left;
 }
 .row,
 .actions,

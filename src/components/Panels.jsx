@@ -347,14 +347,37 @@ export function AnnotationList({
   );
 }
 
-export function AnnotationDetails({ item, open, onUpdate, onDelete, onClose }) {
+export function AnnotationDetails({
+  item,
+  gatewayNames = [],
+  open,
+  onUpdate,
+  onDelete,
+  onClose,
+}) {
   const text = useRef(null);
+  const readingsTable = useRef(null);
+  const pendingReadingFocus = useRef(null);
   useEffect(() => {
     if (open && item?.type === "text") {
       text.current?.focus();
       text.current?.select();
     }
   }, [item?.id, open]);
+  useEffect(() => {
+    if (pendingReadingFocus.current === null) return;
+    const { index, gateway } = pendingReadingFocus.current;
+    const input = readingsTable.current?.rows[index]?.querySelector(
+      gateway ? 'input[type="number"]' : 'input[type="text"]',
+    );
+    pendingReadingFocus.current = null;
+    input?.focus();
+  }, [item?.id, item?.readings?.length]);
+  function addReading(gateway = "") {
+    if (item.readings.length >= 300) return;
+    pendingReadingFocus.current = { index: item.readings.length, gateway };
+    onUpdate({ readings: [...item.readings, { ...blankReading(), gateway }] });
+  }
   const updateReading = (index, key, value) =>
     onUpdate({
       readings: item.readings.map((row, i) =>
@@ -466,6 +489,26 @@ export function AnnotationDetails({ item, open, onUpdate, onDelete, onClose }) {
           {item.type === "point" && (
             <div id="signal-section" className="section">
               <h3 style={{ marginBottom: 12 }}>Signal test</h3>
+              {!!gatewayNames.length && (
+                <div
+                  className="gateway-pills"
+                  role="group"
+                  aria-label="Add gateway reading"
+                >
+                  {gatewayNames.map((gateway) => (
+                    <button
+                      key={gateway}
+                      type="button"
+                      className="gateway-pill"
+                      aria-label={`Add reading for ${gateway}`}
+                      disabled={item.readings.length >= 300}
+                      onClick={() => addReading(gateway)}
+                    >
+                      {gateway}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="table-wrap">
                 <table className="readings">
                   <thead>
@@ -486,7 +529,7 @@ export function AnnotationDetails({ item, open, onUpdate, onDelete, onClose }) {
                       </th>
                     </tr>
                   </thead>
-                  <tbody id="reading-rows">
+                  <tbody id="reading-rows" ref={readingsTable}>
                     {item.readings.map((row, index) => (
                       <tr key={index}>
                         {["gateway", "rssi", "snr"].map((key) => (
@@ -534,9 +577,7 @@ export function AnnotationDetails({ item, open, onUpdate, onDelete, onClose }) {
                 id="add-reading"
                 className="add-reading"
                 disabled={item.readings.length >= 300}
-                onClick={() =>
-                  onUpdate({ readings: [...item.readings, blankReading()] })
-                }
+                onClick={() => addReading()}
               >
                 + Add gateway reading
               </button>
