@@ -1,17 +1,37 @@
 # Floor Plan Annotator
 
-https://ernest-fine.github.io/
+React application for technicians to annotate floor plans and record manual gateway signal readings.
 
-A self-contained HTML tool for technicians. Open `index.html` directly or serve this directory; no build or installation required.
+**Live:** https://ernest-fine.github.io/floor-plan-annotator/
 
-- JPEG / PNG floor plans.
-- Colored numbered points with gateway, RSSI (dBm), and SNR (dB) readings.
-- Text, arrows, and freehand drawing.
-- Move, delete, undo, redo, pan, and zoom.
-- Full-viewport map with collapsible floating panels and Hide controls.
-- Annotated PNG, optional signal table, readings CSV, and editable project JSON.
-- Browser autosave. Images and readings stay on the device.
+## Development
 
-Input limit: 25 MB / 24 megapixels. Save a project JSON to transfer work between browsers or devices.
+Requires Node.js 22.12+ (Node 24 recommended).
 
-GitHub Pages publishes the root of `main`; `.nojekyll` bypasses Jekyll.
+```sh
+npm ci
+npm run dev
+```
+
+Open the URL printed by Vite. Use `npm test` for project/geometry/history and touch-gesture tests, `npm run build` for production, and `npm run preview` to inspect the production build.
+
+## Features
+
+- Full-viewport floor plan; collapsible floating panels and Hide controls.
+- Phone-readable colored pins with gateway, RSSI (dBm), and SNR (dB) readings.
+- Text, arrows, handwriting, move/delete, undo/redo.
+- One-finger pan in Select; two-finger pinch zoom in all tools.
+- Annotated PNG with optional readings table; CSV; editable `.floor-map.json` projects.
+- Browser-local autosave; compatible with project files from the original HTML tool.
+
+Images and readings stay on the device. Input limits: 25 MB / 24 megapixels. Save a project JSON to transfer work between browsers or devices.
+
+## Source
+
+- `src/App.jsx`: application state and commands.
+- `src/components/`: map interaction, SVG annotations, and floating panels.
+- `src/hooks/useProject.js`: undo/redo and browser persistence.
+- `src/lib/`: project schema, geometry, files, IndexedDB, and image/CSV export.
+- `tests/`: project compatibility, signal values, history, pin sizing, and pinch gesture regression tests.
+
+GitHub Actions tests, builds, and publishes `dist/` on pushes to `main`. Vite's base path is `/floor-plan-annotator/`.
