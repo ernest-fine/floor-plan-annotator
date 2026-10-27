@@ -1,12 +1,21 @@
-import type { DrawingAnnotation, HistoryState } from "@/features/annotator/domain/types";
+import type {
+  DrawingAnnotation,
+  HistoryState,
+} from "@/features/annotator/domain/types";
 import { describe, it, expect } from "vitest";
-import {emptyProject, createItem} from "@/features/annotator/domain/annotations";
-import {validateProject} from "@/features/annotator/domain/projectSchema";
-import {validReading} from "@/features/annotator/domain/signalReadings";
-import {moveItem, arrowHead} from "@/features/annotator/domain/annotationGeometry";
-import {historyReducer} from "@/features/annotator/domain/documentReducer";
-import {reportRows} from "@/features/annotator/domain/signalReadings";
-import {fileBase} from "@/features/annotator/io/projectFileName";
+import {
+  emptyProject,
+  createItem,
+} from "@/features/annotator/domain/annotations";
+import { validateProject } from "@/features/annotator/domain/projectSchema";
+import { validReading } from "@/features/annotator/domain/signalReadings";
+import {
+  moveItem,
+  arrowHead,
+} from "@/features/annotator/domain/annotationGeometry";
+import { historyReducer } from "@/features/annotator/domain/documentReducer";
+import { reportRows } from "@/features/annotator/domain/signalReadings";
+import { fileBase } from "@/features/annotator/io/projectFileName";
 
 const point = () => createItem("point", [0.2, 0.3], "#d8322a", 2.8, 1);
 const project = () => ({
@@ -27,8 +36,11 @@ describe("project compatibility and readings", () => {
     const value = project();
     value.nextNumber = 99;
     value.items[0].readings = [{ gateway: "GW A", rssi: "-87", snr: "0" }];
-    const result = validateProject(JSON.parse(JSON.stringify(value)));
+    const result = validateProject(
+      JSON.parse(JSON.stringify({ ...value, version: 1 })),
+    );
     expect(result.nextNumber).toBe(2);
+    expect(result.version).toBe(2);
     const restoredPoint = result.items[0];
     if (restoredPoint.type !== "point") throw new Error("Expected a point");
     expect(restoredPoint.readings[0].snr).toBe("0");

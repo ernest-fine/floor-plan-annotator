@@ -5,11 +5,11 @@ import {
   IDBObjectStore as FakeStore,
 } from "fake-indexeddb";
 import type { Project } from "@/features/annotator/domain/types";
-import {createItem} from "@/features/annotator/domain/annotations";
+import { createItem } from "@/features/annotator/domain/annotations";
 
 function fixture(src = "data:image/png;base64,AAAA"): Project {
   return {
-    version: 1,
+    version: 2,
     title: "Original",
     image: { src, name: "map.png", width: 1200, height: 800 },
     items: [createItem("point", [0.2, 0.3], "#d8322a", 2.6, 1)],
@@ -25,7 +25,7 @@ async function rawStore() {
     request.onerror = () => reject(request.error);
   });
 }
-async function seed(project: Project) {
+async function seed(project: unknown) {
   const db = await rawStore();
   await new Promise<void>((resolve) => {
     const tx = db.transaction("projects", "readwrite");
@@ -56,10 +56,11 @@ afterEach(() => {
 describe("image-separated autosave", () => {
   it("reads an existing version-one project and preserves it when migrated", async () => {
     const project = fixture();
-    await seed(project);
+    const legacy = { ...project, version: 1 };
+    await seed(legacy);
     const { readSavedProject, saveProjectLocally } =
       await import("@/features/annotator/persistence/projectRepository");
-    expect(await readSavedProject()).toEqual(project);
+    expect(await readSavedProject()).toEqual(legacy);
     const edited = { ...project, title: "Edited" };
     await saveProjectLocally(edited);
     expect(await readSavedProject()).toEqual(edited);
@@ -103,7 +104,8 @@ describe("image-separated autosave", () => {
       tx.oncomplete = () => resolve();
     });
     db.close();
-    const { saveProjectLocally } = await import("@/features/annotator/persistence/projectRepository");
+    const { saveProjectLocally } =
+      await import("@/features/annotator/persistence/projectRepository");
     await saveProjectLocally(fixture());
     expect(JSON.stringify(await storedValues())).not.toContain("obsolete-");
   });

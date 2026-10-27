@@ -1,17 +1,31 @@
-import {useRef,useState,useImperativeHandle} from "react";
-import type {MapCanvasProps} from "../../types/map";
-export type {MapCanvasHandle,MapCanvasProps} from "../../types/map";
+import { useRef, useState, useImperativeHandle } from "react";
+import type { MapCanvasProps } from "../../types/map";
+export type { MapCanvasHandle, MapCanvasProps } from "../../types/map";
 import AnnotationLayer from "./AnnotationLayer";
 import useMapViewport from "../../hooks/useMapViewport";
 import useAnnotationGestures from "../../hooks/useAnnotationGestures";
-export default function MapCanvas(props:MapCanvasProps){
+export default function MapCanvas(props: MapCanvasProps) {
   // @profile:map-renders
-  const {project,selectedId,tool,onUpload,onChooseImage}=props;
-  const overlay=useRef<SVGSVGElement>(null),[dropping,setDropping]=useState(false);
-  const view=useMapViewport(project.image,props.onZoom);
-  const gestures=useAnnotationGestures({...props,view,overlay});
-  const {viewport,stage,width,height,marginTop}=view,image=project.image,touchAction="none";
-  useImperativeHandle(props.ref,()=>({zoomBy(delta){if(gestures.isActive())gestures.cancel();view.zoomBy(delta);},fit(){if(gestures.isActive())gestures.cancel();view.fit();},cancel:gestures.cancel,reveal:view.reveal}));
+  const { project, selectedId, tool, onUpload, onChooseImage } = props;
+  const overlay = useRef<SVGSVGElement>(null),
+    [dropping, setDropping] = useState(false);
+  const view = useMapViewport(project.image, props.onZoom);
+  const gestures = useAnnotationGestures({ ...props, view, overlay });
+  const { viewport, stage, width, height, marginTop } = view,
+    image = project.image,
+    touchAction = "none";
+  useImperativeHandle(props.ref, () => ({
+    zoomBy(delta) {
+      if (gestures.isActive()) gestures.cancel();
+      view.zoomBy(delta);
+    },
+    fit() {
+      if (gestures.isActive()) gestures.cancel();
+      view.fit();
+    },
+    cancel: gestures.cancel,
+    reveal: view.reveal,
+  }));
   return (
     <main aria-label="Floor map workspace">
       <div
@@ -71,7 +85,13 @@ export default function MapCanvas(props:MapCanvasProps){
               style={{ touchAction }}
               onKeyDown={gestures.handlers.keyDown}
             >
-            <AnnotationLayer items={project.items} preview={gestures.preview} image={image} selectedId={selectedId} width={width}/>
+              <AnnotationLayer
+                items={project.items}
+                preview={gestures.preview}
+                image={image}
+                selectedId={selectedId}
+                width={width}
+              />
             </svg>
           </div>
         )}

@@ -1,7 +1,7 @@
-import type {Project} from "../domain/types";
-import {reportRows} from "../domain/signalReadings";
-import {fileBase} from "../io/projectFileName";
-import {download} from "@/shared/lib/download";
+import type { Project } from "../domain/types";
+import { reportRows } from "../domain/signalReadings";
+import { fileBase } from "../io/projectFileName";
+import { download } from "@/shared/lib/download";
 export function exportCsv(project: Project) {
   const cell = (value: unknown) => {
     let text = String(value ?? "");

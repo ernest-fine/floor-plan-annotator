@@ -10,15 +10,17 @@ export const COLORS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 export const LABELS: Record<AnnotationType, string> = {
+  gateway: "Gateway",
   point: "Test point",
   text: "Text annotation",
   arrow: "Arrow",
   pen: "Handwriting",
 };
 
-export const SYMBOLS = { text: "T", arrow: "↗", pen: "∿" };
+export const SYMBOLS = { gateway: "G", text: "T", arrow: "↗", pen: "∿" };
 
 export const TOOL_NAMES: Record<Tool, string> = {
+  gateway: "Gateway",
   select: "Select",
   point: "Dot",
   text: "Text",
@@ -27,6 +29,7 @@ export const TOOL_NAMES: Record<Tool, string> = {
 };
 
 export const HINTS: Record<Tool, string> = {
+  gateway: "Tap to place a gateway pin. Name it before entering readings.",
   select: "Drag the map to pan. Tap an annotation to edit.",
   point: "Tap the map to place a dot. Tap a dot for readings.",
   text: "Tap to place text.",

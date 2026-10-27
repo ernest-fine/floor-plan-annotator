@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => ({
           },
         }
       : undefined,
-  resolve: {alias: {"@": resolve("src")}},
+  resolve: { alias: { "@": resolve("src") } },
   base: "/floor-plan-annotator/",
   test: { include: ["tests/**/*.test.{ts,tsx}"] },
 }));

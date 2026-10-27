@@ -1,8 +1,8 @@
-import type {Project} from "../domain/types";
-import {decodeImage} from "../io/projectFiles";
-import {fileBase} from "../io/projectFileName";
-import {download} from "@/shared/lib/download";
-import {reportLayout,drawItem,drawReport} from "./canvasRenderer";
+import type { Project } from "../domain/types";
+import { decodeImage } from "../io/projectFiles";
+import { fileBase } from "../io/projectFileName";
+import { download } from "@/shared/lib/download";
+import { reportLayout, drawItem, drawReport } from "./canvasRenderer";
 export async function exportPng(project: Project, includeTable: boolean) {
   if (!project.image) return;
   const mapImage = project.image;

@@ -1,4 +1,4 @@
-import type { Annotation, AnnotationType, DotAnnotation, TextAnnotation, Project, LoadedProject, Reading, MapImage, Position, HistoryState, HistoryAction } from "./types";
+import type { HistoryState, HistoryAction } from "./types";
 export function historyReducer(
   state: HistoryState,
   action: HistoryAction,

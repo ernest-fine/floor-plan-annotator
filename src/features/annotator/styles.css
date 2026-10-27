@@ -605,3 +605,29 @@
 .viewport {
   inset: 0;
 }
+
+.tools {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.gateway-chip {
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  border-radius: 0;
+  padding-top: 6px;
+}
+
+@media (max-width: 540px) {
+  .top-controls {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .top-controls #tools-toggle {
+    position: static;
+    transform: none;
+    justify-self: center;
+    min-width: 0;
+  }
+  .top-controls button {
+    white-space: nowrap;
+  }
+}

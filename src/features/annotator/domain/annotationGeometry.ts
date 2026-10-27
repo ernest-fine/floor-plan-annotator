@@ -1,5 +1,5 @@
-import type { Annotation, AnnotationType, DotAnnotation, TextAnnotation, Project, LoadedProject, Reading, MapImage, Position, HistoryState, HistoryAction } from "./types";
-import {clamp} from "@/shared/lib/math";
+import type { Annotation, MapImage, Position } from "./types";
+import { clamp } from "@/shared/lib/math";
 export function textLines(text: string) {
   return String(text || "Text annotation")
     .split("\n")
@@ -34,7 +34,7 @@ export function arrowHead(points: Position[], width: number): Position[] {
 }
 
 export function measure(item: Annotation, width: number) {
-  return item.type === "point"
+  return item.type === "point" || item.type === "gateway"
     ? (width * item.size) / 200
     : item.type === "text"
       ? (width * item.size) / 100
@@ -73,4 +73,28 @@ export function moveItem<T extends Annotation>(
     ...item,
     points: item.points.map((p): Position => [p[0] + dx, p[1] + dy]),
   };
+}
+
+export function gatewayTriangle(
+  x: number,
+  y: number,
+  radius: number,
+): Position[] {
+  return [
+    [x, y - radius],
+    [x + radius, y + radius * 0.85],
+    [x - radius, y + radius * 0.85],
+  ];
+}
+
+export function arrowGeometry(
+  points: Position[],
+  width: number,
+): { shaft: Position[]; head: Position[] } {
+  const head = arrowHead(points, width);
+  const base: Position = [
+    (head[1][0] + head[2][0]) / 2,
+    (head[1][1] + head[2][1]) / 2,
+  ];
+  return { shaft: [points[0], base], head };
 }

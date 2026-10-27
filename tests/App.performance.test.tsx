@@ -24,7 +24,7 @@ beforeEach(() => {
   mocks.save.mockReset();
   mocks.restore.mockReset();
   const project: LoadedProject = {
-    version: 1,
+    version: 2,
     title: "Profile fixture",
     image: {
       src: "data:image/png;base64,AAAA",

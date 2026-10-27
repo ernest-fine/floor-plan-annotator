@@ -1,4 +1,8 @@
-import type { Annotation, Project, Position } from "../src/features/annotator/domain/types";
+import type {
+  Annotation,
+  Project,
+  Position,
+} from "../src/features/annotator/domain/types";
 type Metrics = {
   counts: Record<string, number>;
   puts: {
@@ -89,8 +93,32 @@ function fixture(count: number, large = false): Project {
           0.15 + j * 0.015 + Math.sin(i * 0.08) * 0.02,
         ]),
       });
+  items.push(
+    {
+      id: "gateway-north",
+      type: "gateway",
+      number: 1,
+      name: "GW North",
+      notes: "",
+      x: 0.15,
+      y: 0.05,
+      color: "#127a50",
+      size: 2.6,
+    },
+    {
+      id: "gateway-south",
+      type: "gateway",
+      number: 2,
+      name: "GW South",
+      notes: "",
+      x: 0.8,
+      y: 0.9,
+      color: "#2f6fd6",
+      size: 2.6,
+    },
+  );
   return {
-    version: 1,
+    version: 2,
     title: "Synthetic profile",
     image,
     items,
@@ -270,8 +298,8 @@ async function verifyReload(project: Project, expectedCount: number) {
       cases: [],
     };
     for (const [name, count, large] of [
-      ["phone screenshot / 6 pins", 6, false],
-      ["large plan / 500 pins + 40 strokes", 500, true],
+      ["phone screenshot / 6 pins + 2 gateways", 6, false],
+      ["large plan / 500 pins + 40 strokes + 2 gateways", 500, true],
     ] as const) {
       status.textContent = "Profiling " + name + "…";
       const project = fixture(count, large),

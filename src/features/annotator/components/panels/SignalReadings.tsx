@@ -1,115 +1,172 @@
-import {useRef,useEffect} from "react";
-import type {DotAnnotation,Reading} from "../../domain/types";
-import {blankReading} from "../../domain/signalReadings";
+import { MAX_SIGNAL_LENGTH } from "../../domain/limits";
+import { useEffect, useRef, useMemo } from "react";
 import Button from "@/shared/ui/Button";
+import NumericInput from "@/shared/ui/NumericInput";
+import { registeredGateways, createGatewayLookup } from "../../domain/gateways";
+import {
+  normalizeRssiMagnitude,
+  rssiMagnitude,
+} from "../../domain/signalReadings";
+import type { DotAnnotation, GatewayAnnotation } from "../../domain/types";
+import type { SignalReadingActions } from "../../types/readings";
 import GatewayPills from "./GatewayPills";
-export default function SignalReadings({item,gatewayNames,onUpdate}:{item:DotAnnotation;gatewayNames:string[];onUpdate:(patch:{readings:Reading[]})=>void}){
-  const readingsTable = useRef<HTMLTableSectionElement>(null);
-  const pendingReadingFocus = useRef<{ index: number; gateway: string } | null>(
-    null,
+import "./SignalReadings.css";
+
+export default function SignalReadings({
+  item,
+  gateways,
+  actions,
+}: {
+  item: DotAnnotation;
+  gateways: GatewayAnnotation[];
+  actions: SignalReadingActions;
+}) {
+  const available = useMemo(() => registeredGateways(gateways), [gateways]);
+  const resolveGateway = useMemo(
+    () => createGatewayLookup(available),
+    [available],
   );
+  const readingsTable = useRef<HTMLTableSectionElement>(null);
+  const pendingFocus = useRef<{ itemId: string; index: number } | null>(null);
+  const cannotAdd = !available.length || item.readings.length >= 300;
+
   useEffect(() => {
-    if (pendingReadingFocus.current === null) return;
-    const { index, gateway } = pendingReadingFocus.current;
-    const input = readingsTable.current?.rows[
-      index
-    ]?.querySelector<HTMLInputElement>(
-      gateway ? 'input[type="number"]' : 'input[type="text"]',
-    );
-    pendingReadingFocus.current = null;
-    input?.focus();
-  }, [item?.id, item?.type === "point" ? item.readings.length : 0]);
-  function addReading(gateway = "") {
-    if (item?.type !== "point") return;
-    if (item.readings.length >= 300) return;
-    pendingReadingFocus.current = { index: item.readings.length, gateway };
-    onUpdate({ readings: [...item.readings, { ...blankReading(), gateway }] });
+    const pending = pendingFocus.current;
+    pendingFocus.current = null;
+    if (!pending || pending.itemId !== item.id) return;
+    readingsTable.current?.rows[pending.index]
+      ?.querySelector<HTMLInputElement>("input")
+      ?.focus();
+  }, [item.id, item.readings.length]);
+
+  function addReading(gatewayId: string) {
+    if (cannotAdd || !available.some((gateway) => gateway.id === gatewayId))
+      return;
+    pendingFocus.current = { itemId: item.id, index: item.readings.length };
+    actions.add(gatewayId);
   }
-  const updateReading = (index: number, key: keyof Reading, value: string) => {
-    if (item?.type !== "point") return;
-    onUpdate({
-      readings: item.readings.map((row, i) =>
-        i === index ? { ...row, [key]: value } : row,
-      ),
-    });
-  };
-return (<div id="signal-section" className="section">
-              <h3 style={{ marginBottom: 12 }}>Signal test</h3>
-              <GatewayPills gatewayNames={gatewayNames} disabled={item.readings.length >= 300} onAdd={addReading}/>
-              <div className="table-wrap">
-                <table className="readings">
-                  <thead>
-                    <tr>
-                      <th scope="col">Gateway name</th>
-                      <th scope="col">
-                        RSSI
-                        <br />
-                        dBm
-                      </th>
-                      <th scope="col">
-                        SNR
-                        <br />
-                        dB
-                      </th>
-                      <th scope="col">
-                        <span className="sr-only">Remove</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody id="reading-rows" ref={readingsTable}>
-                    {item.readings.map((row, index) => (
-                      <tr key={index}>
-                        {(["gateway", "rssi", "snr"] as const).map((key) => (
-                          <td key={key}>
-                            <input
-                              type={key === "gateway" ? "text" : "number"}
-                              inputMode="text"
-                              step={key === "gateway" ? undefined : "any"}
-                              maxLength={key === "gateway" ? 160 : undefined}
-                              aria-label={`${key === "gateway" ? "Gateway name" : key.toUpperCase()} reading ${index + 1}`}
-                              value={row[key]}
-                              placeholder={
-                                key === "gateway"
-                                  ? "Gateway name"
-                                  : key === "rssi"
-                                    ? "-85"
-                                    : "7.5"
-                              }
-                              onChange={(event) =>
-                                updateReading(index, key, event.target.value)
-                              }
-                            />
-                          </td>
-                        ))}
-                        <td>
-                          <Button
-                            aria-label={`Remove reading ${index + 1}`}
-                            onClick={() =>
-                              onUpdate({
-                                readings: item.readings.filter(
-                                  (_, i) => i !== index,
-                                ),
-                              })
-                            }
-                          >
-                            ×
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <Button
-                id="add-reading"
-                className="add-reading"
-                disabled={item.readings.length >= 300}
-                onClick={() => addReading()}
-              >
-                + Add gateway reading
-              </Button>
-              <p className="small muted" style={{ marginTop: 10 }}>
-                RSSI: dBm · SNR: dB. Repeated gateways allowed.
-              </p>
-            </div>);
+
+  return (
+    <div id="signal-section" className="section signal-readings">
+      <h3 className="signal-readings__heading">Signal test</h3>
+      {!available.length && (
+        <p className="small muted">
+          Add a gateway pin to enter signal readings.
+        </p>
+      )}
+      <GatewayPills
+        gateways={available}
+        disabled={cannotAdd}
+        onAdd={addReading}
+      />
+      <div className="table-wrap">
+        <table className="readings">
+          <thead>
+            <tr>
+              <th scope="col">Gateway name</th>
+              <th scope="col">
+                RSSI
+                <br />
+                dBm
+              </th>
+              <th scope="col">
+                SNR
+                <br />
+                dB
+              </th>
+              <th scope="col">
+                <span className="sr-only">Remove</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="reading-rows" ref={readingsTable}>
+            {item.readings.map((row, index) => {
+              const gateway = resolveGateway(row);
+              const readingNumber = index + 1;
+              return (
+                <tr key={index}>
+                  <td>
+                    <select
+                      aria-label={`Gateway name reading ${readingNumber}`}
+                      value={gateway?.id ?? ""}
+                      disabled={!available.length}
+                      onChange={(event) =>
+                        actions.update(index, {
+                          gatewayId: event.currentTarget.value,
+                        })
+                      }
+                    >
+                      {!gateway && (
+                        <option value="" disabled>
+                          {row.gateway
+                            ? `${row.gateway} (unlinked)`
+                            : "Select gateway"}
+                        </option>
+                      )}
+                      {available.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <NumericInput
+                      aria-label={`RSSI reading ${readingNumber}`}
+                      value={rssiMagnitude(row.rssi)}
+                      prefix="−"
+                      maxLength={MAX_SIGNAL_LENGTH - 1}
+                      allowNegative
+                      disabled={!gateway}
+                      placeholder="85"
+                      onValueChange={(value) =>
+                        actions.update(index, {
+                          rssi: normalizeRssiMagnitude(value),
+                        })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <NumericInput
+                      aria-label={`SNR reading ${readingNumber}`}
+                      value={row.snr}
+                      allowNegative
+                      showSignToggle
+                      maxLength={MAX_SIGNAL_LENGTH}
+                      disabled={!gateway}
+                      placeholder="7.5"
+                      onValueChange={(snr) => actions.update(index, { snr })}
+                    />
+                  </td>
+                  <td>
+                    <Button
+                      className="remove-reading"
+                      aria-label={`Remove reading ${readingNumber}`}
+                      onClick={() => actions.remove(index)}
+                    >
+                      ×
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <Button
+        id="add-reading"
+        className="add-reading"
+        disabled={cannotAdd}
+        onClick={() => {
+          const gateway = available[0];
+          if (gateway) addReading(gateway.id);
+        }}
+      >
+        + Add gateway reading
+      </Button>
+      <p className="small muted signal-readings__help">
+        RSSI: dBm · SNR: dB. Repeated gateways allowed.
+      </p>
+    </div>
+  );
 }

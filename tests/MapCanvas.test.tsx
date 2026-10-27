@@ -1,13 +1,13 @@
 import type { Root } from "react-dom/client";
-import type {Annotation} from "@/features/annotator/domain/types";
-import type {Tool} from "@/features/annotator/types/editor";
+import type { Annotation } from "@/features/annotator/domain/types";
+import type { Tool } from "@/features/annotator/types/editor";
 import type { MapCanvasHandle } from "@/features/annotator/components/map/MapCanvas";
 // @vitest-environment jsdom
 import { act, createRef, Profiler } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import MapCanvas from "@/features/annotator/components/map/MapCanvas";
-import {createItem} from "@/features/annotator/domain/annotations";
+import { createItem } from "@/features/annotator/domain/annotations";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let root: Root, host: HTMLDivElement;
@@ -101,7 +101,7 @@ afterEach(async () => {
 async function setup(tool: Tool = "select", items: Annotation[] = []) {
   const props = {
     ref: createRef<MapCanvasHandle>(),
-    project: { version: 1 as const, title: "", image, items, nextNumber: 1 },
+    project: { version: 2 as const, title: "", image, items, nextNumber: 1 },
     selectedId: null,
     tool,
     color: "#d8322a",
@@ -230,7 +230,14 @@ describe("rendering work budgets", () => {
     });
     vi.stubGlobal("cancelAnimationFrame", (id: number) => queued.delete(id));
     for (let i = 1; i <= 120; i++) {
-      await act(() => dispatchPointer("pointermove", 1, 100 + i, 400 + Math.sin(i * .1) * 20));
+      await act(() =>
+        dispatchPointer(
+          "pointermove",
+          1,
+          100 + i,
+          400 + Math.sin(i * 0.1) * 20,
+        ),
+      );
     }
     expect(queued.size).toBe(1);
     await act(() => {
@@ -269,4 +276,61 @@ describe("viewport commands during gestures", () => {
     expect(props.onAdd).not.toHaveBeenCalled();
     expect(props.onZoom).toHaveBeenLastCalledWith(1.5);
   });
+});
+
+describe("gateway map pins", () => {
+  it("places a named gateway triangle with its own numbering", async () => {
+    const props = await setup("gateway");
+    await pointer("pointerdown", 1, 150, 400);
+    await pointer("pointerup", 1, 150, 400);
+    expect(props.onAdd.mock.calls[0][0]).toMatchObject({
+      type: "gateway",
+      number: 1,
+      name: "Gateway 1",
+    });
+  });
+  it("draws a triangle and gateway label instead of a detector circle", async () => {
+    const gateway = createItem("gateway", [0.2, 0.3], "#127a50", 2.6, 1);
+    await setup("select", [gateway]);
+    expect(document.querySelector("g[data-id] polygon")).not.toBeNull();
+    expect(document.querySelector("g[data-id] text")?.textContent).toBe("G1");
+  });
+});
+
+describe("arrow endpoint geometry", () => {
+  it("ends the visible shaft behind the arrowhead tip", async () => {
+    const arrow: Annotation = {
+      id: "arrow-endpoint",
+      type: "arrow",
+      points: [
+        [0.2, 0.3],
+        [0.8, 0.7],
+      ],
+      color: "#2f6fd6",
+      size: 2.6,
+    };
+    await setup("select", [arrow]);
+    const group = document.querySelector('g[data-id="arrow-endpoint"]')!;
+    const tip = group
+      .querySelector("polygon")!
+      .getAttribute("points")!
+      .split(" ")[0];
+    const shaftEnd = group
+      .querySelector('polyline[stroke="#2f6fd6"]')!
+      .getAttribute("points")!
+      .split(" ")
+      .at(-1);
+    expect(tip).toBe("960,560");
+    expect(shaftEnd).not.toBe(tip);
+  });
+});
+
+it("uses the pointer release location for the arrow tip", async () => {
+  const props = await setup("arrow");
+  await pointer("pointerdown", 1, 100, 400);
+  await pointer("pointermove", 1, 200, 410);
+  await pointer("pointerup", 1, 260, 420);
+  const arrow = props.onAdd.mock.calls[0][0];
+  if (arrow.type !== "arrow") throw new Error("Expected arrow");
+  expect(arrow.points[1][0]).toBeCloseTo((260 - 12) / 376);
 });

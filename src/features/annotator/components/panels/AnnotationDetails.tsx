@@ -1,23 +1,24 @@
 import SignalReadings from "./SignalReadings";
 import Button from "@/shared/ui/Button";
 import Field from "@/shared/ui/Field";
-import type { CSSProperties } from "react";
-import {useEffect,useRef} from "react";
-import type {Annotation,AnnotationPatch,Project,Reading,Position} from "../../domain/types";
-import type {Tool} from "../../types/editor";
-import {blankReading,validReading,hasReading} from "../../domain/signalReadings";
-import {COLORS,HINTS,LABELS,SYMBOLS,TOOL_NAMES} from "../../config/editor";
+
+import { useEffect, useRef } from "react";
+import type { Annotation, AnnotationPatch, Position } from "../../domain/types";
+
+import { LABELS, SYMBOLS } from "../../config/editor";
 import FloatingPanel from "@/shared/ui/FloatingPanel";
 export function AnnotationDetails({
   item,
-  gatewayNames = [],
+  gateways = [],
+  readingActions,
   open,
   onUpdate,
   onDelete,
   onClose,
 }: {
   item: Annotation | undefined;
-  gatewayNames?: string[];
+  gateways?: import("../../domain/types").GatewayAnnotation[];
+  readingActions: import("../../types/readings").SignalReadingActions;
   open: boolean;
   onUpdate: (patch: AnnotationPatch) => void;
   onDelete: () => void;
@@ -61,10 +62,16 @@ export function AnnotationDetails({
             <div className="selection-head">
               <span
                 id="selected-chip"
-                className="dot-chip"
+                className={
+                  "dot-chip" + (item.type === "gateway" ? " gateway-chip" : "")
+                }
                 style={{ background: item.color }}
               >
-                {item.type === "point" ? item.number : SYMBOLS[item.type]}
+                {item.type === "point"
+                  ? item.number
+                  : item.type === "gateway"
+                    ? "G" + item.number
+                    : SYMBOLS[item.type]}
               </span>
               <div>
                 <h3 id="selected-kind">{LABELS[item.type]}</h3>
@@ -74,11 +81,13 @@ export function AnnotationDetails({
                 </p>
               </div>
             </div>
-            {item.type === "point" && (
-              <Field label="Point name">
-<input
+            {(item.type === "point" || item.type === "gateway") && (
+              <Field
+                label={item.type === "gateway" ? "Gateway name" : "Point name"}
+              >
+                <input
                   id="item-name"
-                  maxLength={120}
+                  maxLength={item.type === "gateway" ? 160 : 120}
                   value={item.name}
                   placeholder="Loading bay entrance"
                   onChange={(event) => onUpdate({ name: event.target.value })}
@@ -87,7 +96,7 @@ export function AnnotationDetails({
             )}
             {item.type === "text" && (
               <Field label="Annotation text">
-<textarea
+                <textarea
                   id="item-text"
                   ref={text}
                   maxLength={1000}
@@ -98,7 +107,7 @@ export function AnnotationDetails({
             )}
             <div className="field-pair">
               <Field label="Color">
-<input
+                <input
                   id="item-color"
                   type="color"
                   value={item.color}
@@ -106,7 +115,7 @@ export function AnnotationDetails({
                 />
               </Field>
               <Field label="Size">
-<input
+                <input
                   id="item-size"
                   type="range"
                   min="1"
@@ -119,9 +128,9 @@ export function AnnotationDetails({
                 />
               </Field>
             </div>
-            {item.type === "point" && (
+            {(item.type === "point" || item.type === "gateway") && (
               <Field label="Notes">
-<textarea
+                <textarea
                   id="item-notes"
                   maxLength={2000}
                   value={item.notes}
@@ -131,7 +140,13 @@ export function AnnotationDetails({
               </Field>
             )}
           </div>
-          {item.type === "point" && <SignalReadings item={item} gatewayNames={gatewayNames} onUpdate={onUpdate}/>}
+          {item.type === "point" && (
+            <SignalReadings
+              item={item}
+              gateways={gateways}
+              actions={readingActions}
+            />
+          )}
         </div>
       )}
     </FloatingPanel>

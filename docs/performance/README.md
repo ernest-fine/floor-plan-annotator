@@ -54,9 +54,28 @@ The JSON files contain one recorded production-mode run per version on the same 
 - The viewport observes its border box, ignores identical geometry, and rounds fitted image width down to avoid fractional overflow.
 - Immutable stroke geometry is memoized across zoom updates.
 - Autosave keeps image assets separately in the existing IndexedDB store. Metadata and image switches are transactional; failed writes retain the previous project, obsolete image assets are removed, and save calls stay ordered.
-- Existing version-one autosaves are read and migrated on the next successful save. Downloaded `.floor-map.json` remains version one with its embedded image.
+- Existing version-one autosaves are read and migrated on the next successful save. The original optimization retained version-one downloads. The architecture release now writes version two with its embedded image and gateway references; version-one imports remain supported.
 
 Five new resource regression assertions were run against the previous source and failed, then passed with the optimized source. The suite now includes idle quiescence, hidden panels, repeated resize callbacks, frame batching, background cancellation, legacy storage migration, image-write deduplication, atomic failure, and save ordering.
+
+## Architecture and gateway release
+
+`architecture-gateways-chromium.json` records the refactored application with two placed gateway pins added to each fixture. The same production-mode harness now probes the feature page rather than the thin app shell, so moving ownership cannot hide page renders. Profile builds fail if a required probe is missing.
+
+| Metric                                         | Phone screenshot / 6 pins + 2 gateways | Large plan / 500 pins + 40 strokes + 2 gateways |
+| ---------------------------------------------- | -------------------------------------: | ----------------------------------------------: |
+| Settled idle app renders / writes / long tasks |                              0 / 0 / 0 |                                       0 / 0 / 0 |
+| DOM elements, panels closed                    |                                     80 |                                            2670 |
+| Closed annotation-list rows                    |                                      0 |                                               0 |
+| App / list renders for 16 zoom steps           |                                  0 / 0 |                                           0 / 0 |
+| Resize callbacks for 16 zoom steps             |                                      0 |                                               0 |
+| Map renders for 240 pen events                 |                                     70 |                                              73 |
+| Image characters rewritten for a reading edit  |                                      0 |                                               0 |
+| Reload restores image and all annotations      |                                    Yes |                                             Yes |
+
+Each pair of gateway pins adds ten DOM elements. Frame scheduling varies between runs; the retained rendering, storage and idle-work improvements remain intact. Gateway lookups are built once per report instead of rescanning annotations for each reading.
+
+The release passes 94 automated tests, including architecture boundaries, numeric entry, gateway prerequisites, legacy project round trips, arrow endpoint geometry, import/restore races, gesture cancellation and existing resource regression checks. Browser checks at 320px and 390px covered gateway entry, rejected text input, signed readings, reload, project download and the rendered PNG. Both SVG and PNG use the same shortened arrow shaft with its tip at the final pointer position.
 
 ## Limits
 

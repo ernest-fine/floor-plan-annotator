@@ -1,6 +1,6 @@
-import type {Ref} from "react";
-import type {Annotation,Project} from "../domain/types";
-import type {Tool} from "./editor";
+import type { Ref } from "react";
+import type { Annotation, Project } from "../domain/types";
+import type { Tool } from "./editor";
 export interface MapCanvasHandle {
   zoomBy(delta: number): void;
   fit(): void;

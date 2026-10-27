@@ -1,4 +1,6 @@
-import type { Annotation, AnnotationType, DotAnnotation, TextAnnotation, Project, LoadedProject, Reading, MapImage, Position, HistoryState, HistoryAction } from "./types";
+import { MAX_SIGNAL_LENGTH } from "./limits";
+import { createGatewayLookup, registeredGateways } from "./gateways";
+import type { Annotation, Project, Reading } from "./types";
 
 interface ReportRow {
   number: number;
@@ -39,6 +41,7 @@ export function hasReading(row: Reading) {
 }
 export function reportRows(project: Project): ReportRow[] {
   const rows: ReportRow[] = [];
+  const resolveGateway = createGatewayLookup(registeredGateways(project.items));
   project.items
     .filter((i) => i.type === "point")
     .forEach((item) => {
@@ -49,7 +52,7 @@ export function reportRows(project: Project): ReportRow[] {
           number: item.number,
           color: item.color,
           name: item.name || "Point " + item.number,
-          gateway: r.gateway,
+          gateway: resolveGateway(r)?.name.trim() || r.gateway,
           rssi: r.rssi,
           snr: r.snr,
           notes: index === 0 ? item.notes : "",
@@ -62,4 +65,16 @@ export function reportRows(project: Project): ReportRow[] {
       );
     });
   return rows;
+}
+
+// Drafts may contain a decimal point or sign while the operator is still typing.
+export function isSignalDraft(value: string): boolean {
+  return value.length <= MAX_SIGNAL_LENGTH && /^-?\d*(?:\.\d*)?$/.test(value);
+}
+export function rssiMagnitude(value: string): string {
+  return value.replace(/^[-−]/, "");
+}
+export function normalizeRssiMagnitude(value: string): string {
+  const magnitude = rssiMagnitude(value);
+  return magnitude ? "-" + magnitude : "";
 }

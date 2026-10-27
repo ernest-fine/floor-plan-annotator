@@ -1,6 +1,6 @@
-import type { InputHTMLAttributes } from 'react';
-import Button from './Button';
-import './NumericInput.css';
+import type { InputHTMLAttributes } from "react";
+import Button from "./Button";
+import "./NumericInput.css";
 
 export interface NumericInputProps {
   value: string;
@@ -8,10 +8,10 @@ export interface NumericInputProps {
   allowNegative?: boolean;
   prefix?: string;
   showSignToggle?: boolean;
-  'aria-label': string;
+  "aria-label": string;
   disabled?: boolean;
   placeholder?: string;
-  inputMode?: InputHTMLAttributes<HTMLInputElement>['inputMode'];
+  inputMode?: InputHTMLAttributes<HTMLInputElement>["inputMode"];
   maxLength?: number;
 }
 
@@ -25,15 +25,27 @@ export default function NumericInput({
   allowNegative = false,
   prefix,
   showSignToggle = false,
-  'aria-label': label,
+  "aria-label": label,
   disabled = false,
   placeholder,
-  inputMode = 'decimal',
+  inputMode = "decimal",
   maxLength,
 }: NumericInputProps) {
+  function change(next: string) {
+    if (
+      !disabled &&
+      (maxLength === undefined || next.length <= maxLength) &&
+      (allowNegative ? signedDraft : unsignedDraft).test(next)
+    )
+      onValueChange(next);
+  }
   return (
     <span className="numeric-input">
-      {prefix && <span className="numeric-input__prefix" aria-hidden="true">{prefix}</span>}
+      {prefix && (
+        <span className="numeric-input__prefix" aria-hidden="true">
+          {prefix}
+        </span>
+      )}
       <input
         className="numeric-input__control"
         type="text"
@@ -44,19 +56,18 @@ export default function NumericInput({
         inputMode={inputMode}
         maxLength={maxLength}
         onChange={(event) => {
-          const next = event.currentTarget.value;
-          if (!disabled && (allowNegative ? signedDraft : unsignedDraft).test(next)) {
-            onValueChange(next);
-          }
+          change(event.currentTarget.value);
         }}
       />
       {allowNegative && showSignToggle && (
         <Button
           className="numeric-input__sign"
           aria-label={`Toggle sign for ${label}`}
-          aria-pressed={value.startsWith('-')}
+          aria-pressed={value.startsWith("-")}
           disabled={disabled}
-          onClick={() => onValueChange(value.startsWith('-') ? value.slice(1) : `-${value}`)}
+          onClick={() =>
+            change(value.startsWith("-") ? value.slice(1) : `-${value}`)
+          }
         >
           ±
         </Button>

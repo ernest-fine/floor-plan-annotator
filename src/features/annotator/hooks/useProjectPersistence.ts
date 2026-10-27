@@ -1,10 +1,16 @@
-import {useEffect,useState} from "react";
-import type {Notify} from "@/shared/types/notice";
-import type {ProjectDocument} from "./useProjectDocument";
-import {isRecord} from "../domain/projectSchema";
-import {restoreProject} from "../io/projectFiles";
-import {readSavedProject,saveProjectLocally} from "../persistence/projectRepository";
-export default function useProjectPersistence({project,getProject,getRevision,load}:ProjectDocument,notify:Notify){
+import { useEffect, useState } from "react";
+import type { Notify } from "@/shared/types/notice";
+import type { ProjectDocument } from "./useProjectDocument";
+import { isRecord } from "../domain/projectSchema";
+import { restoreProject } from "../io/projectFiles";
+import {
+  readSavedProject,
+  saveProjectLocally,
+} from "../persistence/projectRepository";
+export default function useProjectPersistence(
+  { project, getProject, getRevision, load }: ProjectDocument,
+  notify: Notify,
+) {
   const [ready, setReady] = useState(false),
     [saveStatus, setSaveStatus] = useState("Local files only"),
     [storageError, setStorageError] = useState(false);
@@ -14,12 +20,7 @@ export default function useProjectPersistence({project,getProject,getRevision,lo
     (async () => {
       try {
         const saved = await readSavedProject();
-        if (
-          isRecord(saved) &&
-          saved.image &&
-          active &&
-          getRevision() === 0
-        ) {
+        if (isRecord(saved) && saved.image && active && getRevision() === 0) {
           const restored = await restoreProject(saved);
           if (active && getRevision() === 0) {
             load(restored);
@@ -64,8 +65,7 @@ export default function useProjectPersistence({project,getProject,getRevision,lo
   }, [ready, project]);
   useEffect(() => {
     const save = () => {
-      if (getProject().image)
-        saveProjectLocally(getProject()).catch(() => {});
+      if (getProject().image) saveProjectLocally(getProject()).catch(() => {});
     };
     const onVisibility = () => {
       if (document.visibilityState === "hidden") save();
@@ -77,5 +77,5 @@ export default function useProjectPersistence({project,getProject,getRevision,lo
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [getProject]);
-  return {saveStatus,storageError};
+  return { saveStatus, storageError };
 }

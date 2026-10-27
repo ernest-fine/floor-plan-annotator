@@ -1,15 +1,15 @@
 import EditorChrome from "../components/workspace/EditorChrome";
 import ProjectFileInputs from "../components/workspace/ProjectFileInputs";
-import {useRef,useCallback} from "react";
-import type {Tool} from "../types/editor";
+import { useRef, useCallback } from "react";
+import type { Tool } from "../types/editor";
 import useNotice from "@/shared/hooks/useNotice";
-import MapCanvas,{type MapCanvasHandle} from "../components/map/MapCanvas";
-import ZoomControls,{type ZoomControlsHandle} from "../components/map/ZoomControls";
-import {AnnotationDetails} from "../components/panels/AnnotationDetails";
-import {AnnotationList} from "../components/panels/AnnotationList";
-import {ExportPanel} from "../components/panels/ExportPanel";
-import {FilesPanel} from "../components/panels/FilesPanel";
-import {ToolsPanel} from "../components/panels/ToolsPanel";
+import MapCanvas, { type MapCanvasHandle } from "../components/map/MapCanvas";
+import { type ZoomControlsHandle } from "../components/map/ZoomControls";
+import { AnnotationDetails } from "../components/panels/AnnotationDetails";
+import { AnnotationList } from "../components/panels/AnnotationList";
+import { ExportPanel } from "../components/panels/ExportPanel";
+import { FilesPanel } from "../components/panels/FilesPanel";
+import { ToolsPanel } from "../components/panels/ToolsPanel";
 import useProjectDocument from "../hooks/useProjectDocument";
 import useProjectPersistence from "../hooks/useProjectPersistence";
 import useProjectFiles from "../hooks/useProjectFiles";
@@ -17,23 +17,69 @@ import useProjectExport from "../hooks/useProjectExport";
 import useEditorState from "../hooks/useEditorState";
 import useAnnotationActions from "../hooks/useAnnotationActions";
 import useKeyboardShortcuts from "../hooks/useKeyboardShortcuts";
-import {enteredGateways} from "../domain/signalReadings";
-import {TOOL_NAMES} from "../config/editor";
-export default function AnnotatorPage(){
+import { registeredGateways } from "../domain/gateways";
+
+export default function AnnotatorPage() {
   // @profile:app-renders
-  const {notice,notify}=useNotice();
-  const document=useProjectDocument(),ui=useEditorState();
-  const {project,canUndo,canRedo,undo,redo}=document;
-  const {saveStatus,storageError}=useProjectPersistence(document,notify);
-  const exports=useProjectExport(document,notify,ui.includeTable),{busy}=exports;
-  const files=useProjectFiles(document,notify,ui.imported,ui.close,busy);
-  const annotations=useAnnotationActions(document,ui,notify),{item}=annotations;
-  const {panel,hidden,selectedId,tool,color,size,includeTable,close,toggle,setHidden,setPanel,setSelectedId,setTool,setColor,setSize,setIncludeTable}=ui;
-  const map=useRef<MapCanvasHandle>(null),zoomControls=useRef<ZoomControlsHandle>(null);
-  const reportZoom=useCallback((value:number)=>zoomControls.current?.setZoom(value),[]);
-  function chooseTool(value:Tool){map.current?.cancel();setTool(value);if(panel!=="tools")close();}
-  function historyAction(action:()=>void){map.current?.cancel();action();setSelectedId(null);close();}
-  useKeyboardShortcuts({undo:()=>historyAction(undo),redo:()=>historyAction(redo),remove:annotations.remove,escape:()=>{map.current?.cancel();ui.select(null);setTool("select");},chooseTool,canRemove:!!item});
+  const { notice, notify } = useNotice();
+  const document = useProjectDocument(),
+    ui = useEditorState();
+  const { project, canUndo, canRedo, undo, redo } = document;
+  const { saveStatus, storageError } = useProjectPersistence(document, notify);
+  const exports = useProjectExport(document, notify, ui.includeTable),
+    { busy } = exports;
+  const map = useRef<MapCanvasHandle>(null);
+  const afterImport = useCallback(() => {
+    map.current?.cancel();
+    ui.imported();
+  }, [ui.imported]);
+  const files = useProjectFiles(document, notify, afterImport, ui.close, busy);
+  const annotations = useAnnotationActions(document, ui, notify),
+    { item } = annotations;
+  const {
+    panel,
+    hidden,
+    selectedId,
+    tool,
+    color,
+    size,
+    includeTable,
+    close,
+    setPanel,
+    setSelectedId,
+    setTool,
+    setColor,
+    setSize,
+    setIncludeTable,
+  } = ui;
+  const zoomControls = useRef<ZoomControlsHandle>(null);
+  const reportZoom = useCallback(
+    (value: number) => zoomControls.current?.setZoom(value),
+    [],
+  );
+  function chooseTool(value: Tool) {
+    map.current?.cancel();
+    setTool(value);
+    if (panel !== "tools") close();
+  }
+  function historyAction(action: () => void) {
+    map.current?.cancel();
+    action();
+    setSelectedId(null);
+    close();
+  }
+  useKeyboardShortcuts({
+    undo: () => historyAction(undo),
+    redo: () => historyAction(redo),
+    remove: annotations.remove,
+    escape: () => {
+      map.current?.cancel();
+      ui.select(null);
+      setTool("select");
+    },
+    chooseTool,
+    canRemove: !!item,
+  });
   return (
     <div
       className={`workspace ${panel ? panel + "-open" : ""} ${hidden ? "clean-view" : ""}`}
@@ -55,7 +101,19 @@ export default function AnnotatorPage(){
         onMove={annotations.move}
         onSelect={ui.select}
       />
-      <EditorChrome ui={ui} map={map} zoomControls={zoomControls} count={project.items.length} hasImage={!!project.image} hasSelection={!!item} busy={busy} canUndo={canUndo} canRedo={canRedo} onUndo={()=>historyAction(undo)} onRedo={()=>historyAction(redo)}/>
+      <EditorChrome
+        ui={ui}
+        map={map}
+        zoomControls={zoomControls}
+        count={project.items.length}
+        hasImage={!!project.image}
+        hasSelection={!!item}
+        busy={busy}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={() => historyAction(undo)}
+        onRedo={() => historyAction(redo)}
+      />
       {panel === "files" && (
         <FilesPanel
           project={project}
@@ -95,7 +153,8 @@ export default function AnnotatorPage(){
         {panel === "details" && (
           <AnnotationDetails
             item={item}
-            gatewayNames={enteredGateways(project.items)}
+            gateways={registeredGateways(project.items)}
+            readingActions={annotations.readings}
             open={panel === "details"}
             onUpdate={annotations.update}
             onDelete={annotations.remove}
@@ -126,7 +185,7 @@ export default function AnnotatorPage(){
           {notice?.message}
         </span>
       </div>
-      <ProjectFileInputs files={files}/>
+      <ProjectFileInputs files={files} />
     </div>
   );
 }

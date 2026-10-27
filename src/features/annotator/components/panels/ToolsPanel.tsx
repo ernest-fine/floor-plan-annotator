@@ -1,11 +1,11 @@
 import type { CSSProperties } from "react";
-import {useEffect,useRef} from "react";
-import type {Annotation,AnnotationPatch,Project,Reading,Position} from "../../domain/types";
-import type {Tool} from "../../types/editor";
-import {blankReading,validReading,hasReading} from "../../domain/signalReadings";
-import {COLORS,HINTS,LABELS,SYMBOLS,TOOL_NAMES} from "../../config/editor";
+
+import type { Tool } from "../../types/editor";
+
+import { COLORS, HINTS, TOOL_NAMES } from "../../config/editor";
 import FloatingPanel from "@/shared/ui/FloatingPanel";
 const ICONS: Record<Tool, string> = {
+  gateway: "M12 3 22 21H2L12 3Z",
   select: "m5 3 14 10-7 1-3 7-4-18Z",
   point: "M12 2v3m0 14v3M2 12h3m14 0h3",
   text: "M4 6V4h16v2M12 4v16m-4 0h8",
@@ -113,9 +113,9 @@ export function ToolsPanel({
           move annotations. Dot / Text: tap to place. Arrow / Pen: drag to draw.
         </p>
         <p>
-          V Select · D Dot · T Text · A Arrow · P Pen · Delete removes selected
-          · Ctrl/⌘ Z Undo · Ctrl/⌘ Shift Z Redo. Focus an annotation and use
-          arrow keys to move it.
+          V Select · D Dot · G Gateway · T Text · A Arrow · P Pen · Delete
+          removes selected · Ctrl/⌘ Z Undo · Ctrl/⌘ Shift Z Redo. Focus an
+          annotation and use arrow keys to move it.
         </p>
         <p>
           Manual readings. Colors have no automatic signal grading. Project JSON

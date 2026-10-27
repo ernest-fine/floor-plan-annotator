@@ -1,5 +1,5 @@
 import Button from "./Button";
-import type {ReactNode} from "react";
+import type { ReactNode } from "react";
 interface PanelProps {
   id: string;
   className: string;

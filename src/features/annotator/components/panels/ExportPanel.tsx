@@ -1,11 +1,8 @@
 import Button from "@/shared/ui/Button";
 import Field from "@/shared/ui/Field";
-import type { CSSProperties } from "react";
-import {useEffect,useRef} from "react";
-import type {Annotation,AnnotationPatch,Project,Reading,Position} from "../../domain/types";
-import type {Tool} from "../../types/editor";
-import {blankReading,validReading,hasReading} from "../../domain/signalReadings";
-import {COLORS,HINTS,LABELS,SYMBOLS,TOOL_NAMES} from "../../config/editor";
+
+import type { Project } from "../../domain/types";
+
 import FloatingPanel from "@/shared/ui/FloatingPanel";
 export function ExportPanel({
   project,
@@ -36,7 +33,7 @@ export function ExportPanel({
     >
       <div className="section">
         <Field label="Map / survey title">
-<input
+          <input
             id="survey-title"
             maxLength={160}
             value={project.title}

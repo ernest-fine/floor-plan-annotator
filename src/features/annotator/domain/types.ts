@@ -1,7 +1,8 @@
 export type Position = [number, number];
-export type AnnotationType = "point" | "text" | "arrow" | "pen";
+export type AnnotationType = "point" | "text" | "arrow" | "pen" | "gateway";
 export interface Reading {
   gateway: string;
+  gatewayId?: string;
   rssi: string;
   snr: string;
 }
@@ -35,24 +36,34 @@ export interface DrawingAnnotation extends AnnotationBase {
   type: "arrow" | "pen";
   points: Position[];
 }
-export type Annotation = DotAnnotation | TextAnnotation | DrawingAnnotation;
+export interface GatewayAnnotation extends AnnotationBase {
+  type: "gateway";
+  x: number;
+  y: number;
+  number: number;
+  name: string;
+  notes: string;
+}
+export type Annotation =
+  DotAnnotation | TextAnnotation | DrawingAnnotation | GatewayAnnotation;
+export type ReadingUpdate = Partial<
+  Pick<Reading, "gatewayId" | "rssi" | "snr">
+>;
 export interface AnnotationPatch {
   name?: string;
   notes?: string;
   text?: string;
   color?: string;
   size?: number;
-  readings?: Reading[];
 }
 export interface Project {
-  version: 1;
+  version: 2;
   title: string;
   image: MapImage | null;
   items: Annotation[];
   nextNumber: number;
 }
 export type LoadedProject = Project & { image: MapImage };
-export type ProjectUpdate = Project | ((project: Project) => Project);
 export interface HistoryState {
   present: Project;
   past: Project[];

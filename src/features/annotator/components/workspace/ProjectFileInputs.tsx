@@ -1,5 +1,13 @@
 import type useProjectFiles from "../../hooks/useProjectFiles";
-export default function ProjectFileInputs({files}:{files:ReturnType<typeof useProjectFiles>}){return <>      <input
+export default function ProjectFileInputs({
+  files,
+}: {
+  files: ReturnType<typeof useProjectFiles>;
+}) {
+  return (
+    <>
+      {" "}
+      <input
         id="image-file"
         ref={files.imageInput}
         type="file"
@@ -20,4 +28,7 @@ export default function ProjectFileInputs({files}:{files:ReturnType<typeof usePr
           void files.open(event.target.files?.[0]);
           event.target.value = "";
         }}
-      /></>;}
+      />
+    </>
+  );
+}

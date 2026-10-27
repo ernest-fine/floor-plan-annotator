@@ -1,4 +1,4 @@
-import type {Project} from "../domain/types";
+import type { Project } from "../domain/types";
 export function fileBase(project: Pick<Project, "title" | "image">) {
   return (
     (project.title || project.image?.name || "floor-map")

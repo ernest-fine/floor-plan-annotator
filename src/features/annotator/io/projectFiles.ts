@@ -1,6 +1,6 @@
 import type { LoadedProject } from "../domain/types";
-import {MAX_FILE, MAX_PIXELS} from "../domain/limits";
-import {validateProject} from "../domain/projectSchema";
+import { MAX_FILE, MAX_PIXELS } from "../domain/limits";
+import { validateProject } from "../domain/projectSchema";
 
 export function decodeImage(src: string): Promise<HTMLImageElement> {
   return new Promise<HTMLImageElement>((resolve, reject) => {
@@ -41,7 +41,7 @@ export async function projectFromImage(file: File): Promise<LoadedProject> {
   if (!/^data:image\/(png|jpeg);base64,/i.test(src))
     throw new Error("Choose a JPEG or PNG image.");
   return hydrateImage({
-    version: 1,
+    version: 2,
     title: file.name.replace(/\.[^.]+$/, ""),
     image: { src, name: file.name, width: 1, height: 1 },
     items: [],

@@ -1,9 +1,7 @@
-import type { CSSProperties } from "react";
-import {useEffect,useRef} from "react";
-import type {Annotation,AnnotationPatch,Project,Reading,Position} from "../../domain/types";
-import type {Tool} from "../../types/editor";
-import {blankReading,validReading,hasReading} from "../../domain/signalReadings";
-import {COLORS,HINTS,LABELS,SYMBOLS,TOOL_NAMES} from "../../config/editor";
+import type { Annotation } from "../../domain/types";
+
+import { validReading, hasReading } from "../../domain/signalReadings";
+import { LABELS, SYMBOLS } from "../../config/editor";
 import FloatingPanel from "@/shared/ui/FloatingPanel";
 export function AnnotationList({
   items,
@@ -56,12 +54,22 @@ export function AnnotationList({
                 aria-pressed={item.id === selectedId}
                 onClick={() => onSelect(item)}
               >
-                <span className="dot-chip" style={{ background: item.color }}>
-                  {item.type === "point" ? item.number : SYMBOLS[item.type]}
+                <span
+                  className={
+                    "dot-chip" +
+                    (item.type === "gateway" ? " gateway-chip" : "")
+                  }
+                  style={{ background: item.color }}
+                >
+                  {item.type === "point"
+                    ? item.number
+                    : item.type === "gateway"
+                      ? "G" + item.number
+                      : SYMBOLS[item.type]}
                 </span>
                 <span className="label">
                   <strong>
-                    {item.type === "point"
+                    {item.type === "point" || item.type === "gateway"
                       ? item.name || "Point " + item.number
                       : item.type === "text"
                         ? item.text || "Text annotation"

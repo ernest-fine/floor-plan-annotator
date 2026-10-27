@@ -1,7 +1,13 @@
-import {memo,useMemo} from "react";
-import type {Annotation,MapImage,Position} from "../../domain/types";
-import {geometry,measure,textLines,arrowHead} from "../../domain/annotationGeometry";
-import {describe} from "../../domain/annotationLabels";
+import { memo, useMemo } from "react";
+import type { Annotation, MapImage } from "../../domain/types";
+import {
+  geometry,
+  measure,
+  textLines,
+  arrowGeometry,
+  gatewayTriangle,
+} from "../../domain/annotationGeometry";
+import { describe } from "../../domain/annotationLabels";
 const AnnotationShape = memo(function AnnotationShape({
   item,
   image,
@@ -16,13 +22,25 @@ const AnnotationShape = memo(function AnnotationShape({
   draft: boolean;
 }) {
   // @profile:shape-renders
-  const { x, y, points } = useMemo(() => geometry(item, image), [item, image]);
+  const { x, y, points, arrow } = useMemo(() => {
+    const value = geometry(item, image);
+    return {
+      ...value,
+      arrow:
+        item.type === "arrow"
+          ? arrowGeometry(value.points, measure(item, image.width))
+          : null,
+    };
+  }, [item, image]);
   const polyline = useMemo(
     () => points.map((point) => point.join(",")).join(" "),
     [points],
   );
+  const visiblePolyline = arrow
+    ? arrow.shaft.map((point) => point.join(",")).join(" ")
+    : polyline;
   const m =
-    item.type === "point"
+    item.type === "point" || item.type === "gateway"
       ? Math.max(
           measure(item, image.width),
           Math.max(12, (16 * item.size) / 2.8) * scale,
@@ -35,7 +53,7 @@ const AnnotationShape = memo(function AnnotationShape({
     "aria-label": describe(item),
     "aria-pressed": selected,
   };
-  if (item.type === "point")
+  if (item.type === "point" || item.type === "gateway")
     return (
       <g {...common}>
         <circle cx={x} cy={y} r={Math.max(22 * scale, m)} fill="transparent" />
@@ -48,25 +66,44 @@ const AnnotationShape = memo(function AnnotationShape({
           stroke={selected ? "#127a50" : "transparent"}
           strokeWidth={2 * scale}
         />
-        <circle
-          cx={x}
-          cy={y}
-          r={m}
-          fill={item.color}
-          stroke="#fff"
-          strokeWidth={Math.max(1.4 * scale, m * 0.13)}
-        />
+        {item.type === "gateway" ? (
+          <polygon
+            points={gatewayTriangle(x, y, m)
+              .map((point) => point.join(","))
+              .join(" ")}
+            fill={item.color}
+            stroke="#fff"
+            strokeWidth={Math.max(1.4 * scale, m * 0.13)}
+            strokeLinejoin="round"
+          />
+        ) : (
+          <circle
+            cx={x}
+            cy={y}
+            r={m}
+            fill={item.color}
+            stroke="#fff"
+            strokeWidth={Math.max(1.4 * scale, m * 0.13)}
+          />
+        )}
         <text
           x={x}
           y={y + m * 0.34}
           textAnchor="middle"
           fill="#fff"
-          fontSize={m * (String(item.number).length > 2 ? 0.64 : 0.9)}
+          fontSize={
+            m *
+            (item.type === "gateway"
+              ? 0.65
+              : String(item.number).length > 2
+                ? 0.64
+                : 0.9)
+          }
           fontFamily="system-ui,sans-serif"
           fontWeight="750"
           pointerEvents="none"
         >
-          {item.number}
+          {item.type === "gateway" ? "G" + item.number : item.number}
         </text>
       </g>
     );
@@ -124,27 +161,25 @@ const AnnotationShape = memo(function AnnotationShape({
       {selected && (
         <polyline
           className="focus-ring"
-          points={polyline}
+          points={visiblePolyline}
           fill="none"
           stroke="#127a50"
           strokeWidth={m + 5 * scale}
           strokeOpacity=".25"
-          strokeLinecap="round"
+          strokeLinecap={arrow ? "butt" : "round"}
         />
       )}
       <polyline
-        points={polyline}
+        points={visiblePolyline}
         fill="none"
         stroke={item.color}
         strokeWidth={m}
-        strokeLinecap="round"
+        strokeLinecap={arrow ? "butt" : "round"}
         strokeLinejoin="round"
       />
-      {item.type === "arrow" && (
+      {arrow && (
         <polygon
-          points={arrowHead(points, m)
-            .map((point) => point.join(","))
-            .join(" ")}
+          points={arrow.head.map((point) => point.join(",")).join(" ")}
           fill={item.color}
         />
       )}
@@ -160,8 +195,37 @@ const AnnotationShape = memo(function AnnotationShape({
   );
 });
 
-
-export default function AnnotationLayer({items,preview,image,selectedId,width}:{items:Annotation[];preview:Annotation|null;image:MapImage;selectedId:string|null;width:number}){
-  const visible=preview?[...items.filter(item=>item.id!==preview.id),preview]:items;
-  return <>{visible.map(item=><AnnotationShape key={item.id} item={item} image={image} scale={image.width/width} selected={item.id===selectedId} draft={item.id===preview?.id&&!items.some(saved=>saved.id===item.id)}/>)}</>;
+export default function AnnotationLayer({
+  items,
+  preview,
+  image,
+  selectedId,
+  width,
+}: {
+  items: Annotation[];
+  preview: Annotation | null;
+  image: MapImage;
+  selectedId: string | null;
+  width: number;
+}) {
+  const visible = preview
+    ? [...items.filter((item) => item.id !== preview.id), preview]
+    : items;
+  return (
+    <>
+      {visible.map((item) => (
+        <AnnotationShape
+          key={item.id}
+          item={item}
+          image={image}
+          scale={image.width / width}
+          selected={item.id === selectedId}
+          draft={
+            item.id === preview?.id &&
+            !items.some((saved) => saved.id === item.id)
+          }
+        />
+      ))}
+    </>
+  );
 }

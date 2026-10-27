@@ -1,12 +1,16 @@
-import {useRef,useState,useEffect} from "react";
-import type {RefObject,PointerEvent as ReactPointerEvent,KeyboardEvent as ReactKeyboardEvent} from "react";
-import type {Annotation,DrawingAnnotation,Position} from "../domain/types";
-import type {MapCanvasProps} from "../types/map";
-import type {MapViewport} from "./useMapViewport";
-import {clamp} from "@/shared/lib/math";
-import {newId} from "@/shared/lib/id";
-import {moveItem} from "../domain/annotationGeometry";
-import {createItem} from "../domain/annotations";
+import { useRef, useState, useEffect } from "react";
+import type {
+  RefObject,
+  PointerEvent as ReactPointerEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+} from "react";
+import type { Annotation, DrawingAnnotation, Position } from "../domain/types";
+import type { MapCanvasProps } from "../types/map";
+import type { MapViewport } from "./useMapViewport";
+import { clamp } from "@/shared/lib/math";
+import { newId } from "@/shared/lib/id";
+import { moveItem } from "../domain/annotationGeometry";
+import { createPlacedAnnotation } from "../domain/annotations";
 type Gesture =
   | {
       kind: "move";
@@ -21,7 +25,7 @@ type Gesture =
       kind: "place";
       start: Position;
       screen: Position;
-      tool: "point" | "text";
+      tool: "point" | "text" | "gateway";
       bounds: DOMRect;
     }
   | { kind: "draw"; screen: Position; moved: boolean; bounds: DOMRect };
@@ -32,11 +36,35 @@ interface Pinch {
   y: number;
 }
 
-interface GestureProps extends Omit<MapCanvasProps,"ref"|"onChooseImage"|"onUpload"|"onZoom"> {view:MapViewport;overlay:RefObject<SVGSVGElement|null>}
-export default function useAnnotationGestures({project,tool,color,size,busy,onAdd,onMove,onSelect,onInteract,view:viewportState,overlay}:GestureProps){
-  const {viewport,stage}=viewportState;const image=project.image;
-  const gesture=useRef<Gesture|null>(null),previewRef=useRef<Annotation|null>(null),touches=useRef(new Map<number,Position>()),pinch=useRef<Pinch|null>(null),suppressTouch=useRef(false),previewFrame=useRef<number|null>(null);
-  const [preview,setPreview]=useState<Annotation|null>(null);
+interface GestureProps extends Omit<
+  MapCanvasProps,
+  "ref" | "onChooseImage" | "onUpload" | "onZoom"
+> {
+  view: MapViewport;
+  overlay: RefObject<SVGSVGElement | null>;
+}
+export default function useAnnotationGestures({
+  project,
+  tool,
+  color,
+  size,
+  busy,
+  onAdd,
+  onMove,
+  onSelect,
+  onInteract,
+  view: viewportState,
+  overlay,
+}: GestureProps) {
+  const { viewport, stage } = viewportState;
+  const image = project.image;
+  const gesture = useRef<Gesture | null>(null),
+    previewRef = useRef<Annotation | null>(null),
+    touches = useRef(new Map<number, Position>()),
+    pinch = useRef<Pinch | null>(null),
+    suppressTouch = useRef(false),
+    previewFrame = useRef<number | null>(null);
+  const [preview, setPreview] = useState<Annotation | null>(null);
   function clearPreview() {
     if (previewFrame.current !== null)
       cancelAnimationFrame(previewFrame.current);
@@ -81,7 +109,7 @@ export default function useAnnotationGestures({project,tool,color,size,busy,onAd
     };
   }, []);
 
-  useEffect(()=>cancelInteraction(),[image?.src]);
+  useEffect(() => cancelInteraction(), [image?.src]);
   function position(
     event: { clientX: number; clientY: number },
     rect = overlay.current!.getBoundingClientRect(),
@@ -133,7 +161,10 @@ export default function useAnnotationGestures({project,tool,color,size,busy,onAd
           ? event.target.closest<SVGGElement>("[data-id]")
           : null;
     const screen: Position = [event.clientX, event.clientY];
-    if (target && (tool === "select" || tool === "point")) {
+    if (
+      target &&
+      (tool === "select" || tool === "point" || tool === "gateway")
+    ) {
       const item = project.items.find((item) => item.id === target.dataset.id);
       if (!item) return;
       onSelect(item.id, false);
@@ -152,7 +183,7 @@ export default function useAnnotationGestures({project,tool,color,size,busy,onAd
         screen,
         scroll: [viewport.current!.scrollLeft, viewport.current!.scrollTop],
       };
-    } else if (tool === "point" || tool === "text") {
+    } else if (tool === "point" || tool === "text" || tool === "gateway") {
       gesture.current = { kind: "place", start: point, screen, tool, bounds };
     } else {
       const item: DrawingAnnotation = {
@@ -174,7 +205,20 @@ export default function useAnnotationGestures({project,tool,color,size,busy,onAd
     if (pinch.current && touches.current.size >= 2) {
       const [a, b] = [...touches.current.values()],
         rect = viewport.current!.getBoundingClientRect();
-      viewportState.requestZoom(clamp((pinch.current.zoom*Math.hypot(b[0]-a[0],b[1]-a[1]))/Math.max(1,pinch.current.distance),1,10),{x:pinch.current.x,y:pinch.current.y,screenX:(a[0]+b[0])/2-rect.left,screenY:(a[1]+b[1])/2-rect.top});
+      viewportState.requestZoom(
+        clamp(
+          (pinch.current.zoom * Math.hypot(b[0] - a[0], b[1] - a[1])) /
+            Math.max(1, pinch.current.distance),
+          1,
+          10,
+        ),
+        {
+          x: pinch.current.x,
+          y: pinch.current.y,
+          screenX: (a[0] + b[0]) / 2 - rect.left,
+          screenY: (a[1] + b[1]) / 2 - rect.top,
+        },
+      );
       event.preventDefault();
       return;
     }
@@ -242,6 +286,15 @@ export default function useAnnotationGestures({project,tool,color,size,busy,onAd
     const current = gesture.current;
     if (!current) return;
     gesture.current = null;
+    const pending = previewRef.current;
+    if (current.kind === "draw" && pending?.type === "arrow") {
+      pending.points = [pending.points[0], position(event, current.bounds)];
+      current.moved =
+        Math.hypot(
+          event.clientX - current.screen[0],
+          event.clientY - current.screen[1],
+        ) >= 4;
+    }
     if (
       current.kind === "place" &&
       Math.hypot(
@@ -250,12 +303,12 @@ export default function useAnnotationGestures({project,tool,color,size,busy,onAd
       ) < 8
     ) {
       onAdd(
-        createItem(
+        createPlacedAnnotation(
+          project,
           current.tool,
           current.start,
           color,
           size,
-          project.nextNumber,
         ),
       );
     } else if (
@@ -299,6 +352,17 @@ export default function useAnnotationGestures({project,tool,color,size,busy,onAd
     }
   }
 
-  function pointerCancel(event:ReactPointerEvent<HTMLDivElement>){touches.current.delete(event.pointerId);pinch.current=null;gesture.current=null;showPreview(null);suppressTouch.current=touches.current.size>0;}
-  return {preview,cancel:cancelInteraction,isActive:()=>!!gesture.current||!!pinch.current,handlers:{pointerDown,pointerMove,pointerUp,pointerCancel,keyDown}};
+  function pointerCancel(event: ReactPointerEvent<HTMLDivElement>) {
+    touches.current.delete(event.pointerId);
+    pinch.current = null;
+    gesture.current = null;
+    showPreview(null);
+    suppressTouch.current = touches.current.size > 0;
+  }
+  return {
+    preview,
+    cancel: cancelInteraction,
+    isActive: () => !!gesture.current || !!pinch.current,
+    handlers: { pointerDown, pointerMove, pointerUp, pointerCancel, keyDown },
+  };
 }

@@ -1,12 +1,39 @@
-import type {RefObject} from "react";
-import type {MapCanvasHandle} from "../../types/map";
+import type { RefObject } from "react";
+import type { MapCanvasHandle } from "../../types/map";
 import type useEditorState from "../../hooks/useEditorState";
-import ZoomControls,{type ZoomControlsHandle} from "../map/ZoomControls";
-import {TOOL_NAMES} from "../../config/editor";
-interface ChromeProps {ui:ReturnType<typeof useEditorState>;map:RefObject<MapCanvasHandle|null>;zoomControls:RefObject<ZoomControlsHandle|null>;count:number;hasImage:boolean;hasSelection:boolean;busy:boolean;canUndo:boolean;canRedo:boolean;onUndo:()=>void;onRedo:()=>void}
-export default function EditorChrome({ui,map,zoomControls,count,hasImage,hasSelection,busy,canUndo,canRedo,onUndo,onRedo}:ChromeProps){
- const {panel,hidden,tool,toggle,close,setHidden}=ui;
- return <>      <div className="top-controls chrome">
+import ZoomControls, { type ZoomControlsHandle } from "../map/ZoomControls";
+import { TOOL_NAMES } from "../../config/editor";
+interface ChromeProps {
+  ui: ReturnType<typeof useEditorState>;
+  map: RefObject<MapCanvasHandle | null>;
+  zoomControls: RefObject<ZoomControlsHandle | null>;
+  count: number;
+  hasImage: boolean;
+  hasSelection: boolean;
+  busy: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+}
+export default function EditorChrome({
+  ui,
+  map,
+  zoomControls,
+  count,
+  hasImage,
+  hasSelection,
+  busy,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+}: ChromeProps) {
+  const { panel, hidden, tool, toggle, close, setHidden } = ui;
+  return (
+    <>
+      {" "}
+      <div className="top-controls chrome">
         <button
           id="files-toggle"
           aria-expanded={panel === "files"}
@@ -92,5 +119,6 @@ export default function EditorChrome({ui,map,zoomControls,count,hasImage,hasSele
           Show controls
         </button>
       )}
-</>;
+    </>
+  );
 }

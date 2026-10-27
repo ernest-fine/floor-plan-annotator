@@ -10,10 +10,12 @@ const sharedRoot = resolve(sourceRoot, "shared");
 const appRoot = resolve(sourceRoot, "app");
 
 function filesIn(directory: string): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = resolve(directory, entry.name);
-    return entry.isDirectory() ? filesIn(path) : [path];
-  }).sort();
+  return readdirSync(directory, { withFileTypes: true })
+    .flatMap((entry) => {
+      const path = resolve(directory, entry.name);
+      return entry.isDirectory() ? filesIn(path) : [path];
+    })
+    .sort();
 }
 
 const sourceFiles = filesIn(sourceRoot);
@@ -36,16 +38,27 @@ function resolveLocal(file: string, specifier: string): string | undefined {
       ? resolve(dirname(file), clean)
       : undefined;
   if (!base) return undefined;
-  return [base, ...[".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx"].map((suffix) => base + suffix)]
-    .find((candidate) => existsSync(candidate) && statSync(candidate).isFile()) ?? base;
+  return (
+    [
+      base,
+      ...[".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx"].map(
+        (suffix) => base + suffix,
+      ),
+    ].find(
+      (candidate) => existsSync(candidate) && statSync(candidate).isFile(),
+    ) ?? base
+  );
 }
 
 function importsIn(file: string): Dependency[] {
   const source = readFileSync(file, "utf8");
   // Tokenize strings and comments together so commented imports and text inside
   // strings cannot accidentally become architecture dependencies.
-  const tokens = [...source.matchAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|[\w$]+|[^\s]/g)]
-    .filter(([token]) => !token.startsWith("//") && !token.startsWith("/*"));
+  const tokens = [
+    ...source.matchAll(
+      /\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|[\w$]+|[^\s]/g,
+    ),
+  ].filter(([token]) => !token.startsWith("//") && !token.startsWith("/*"));
   const dependencies: Dependency[] = [];
   for (let index = 0; index < tokens.length; index++) {
     const token = tokens[index][0];
@@ -53,7 +66,8 @@ function importsIn(file: string): Dependency[] {
     const next = tokens[index + 1]?.[0] ?? "";
     if (next === "(" || next === ".") continue; // Dynamic imports / import.meta.
     if (token === "export" && !["*", "{", "type"].includes(next)) continue;
-    let literal = token === "import" && /^["']/.test(next) ? tokens[index + 1] : undefined;
+    let literal =
+      token === "import" && /^["']/.test(next) ? tokens[index + 1] : undefined;
     if (!literal) {
       for (let cursor = index + 1; cursor < tokens.length; cursor++) {
         const current = tokens[cursor][0];
@@ -82,35 +96,52 @@ const report = ({ file, specifier, line }: Dependency) =>
 
 describe("source architecture", () => {
   it("keeps shared modules independent of app and feature modules", () => {
-    const violations = dependencies.filter(({ file, target }) =>
-      inside(file, sharedRoot) && target &&
-      (inside(target, appRoot) || inside(target, resolve(sourceRoot, "features"))),
+    const violations = dependencies.filter(
+      ({ file, target }) =>
+        inside(file, sharedRoot) &&
+        target &&
+        (inside(target, appRoot) ||
+          inside(target, resolve(sourceRoot, "features"))),
     );
     expect(violations.map(report)).toEqual([]);
   });
 
   it("keeps domain dependencies within domain or generic shared libraries", () => {
-    const violations = dependencies.filter(({ file, target }) =>
-      inside(file, domainRoot) && (!target ||
-        (!inside(target, domainRoot) && !inside(target, resolve(sharedRoot, "lib")))),
+    const violations = dependencies.filter(
+      ({ file, target }) =>
+        inside(file, domainRoot) &&
+        (!target ||
+          (!inside(target, domainRoot) &&
+            !inside(target, resolve(sharedRoot, "lib")))),
     );
     expect(violations.map(report)).toEqual([]);
   });
 
   it("lets app consume annotator only through its public entry and stylesheet", () => {
-    const publicImports = new Set(["@/features/annotator", "@/features/annotator/styles.css"]);
-    const violations = dependencies.filter(({ file, target, specifier }) =>
-      inside(file, appRoot) && target && inside(target, resolve(sourceRoot, "features")) &&
-      !publicImports.has(specifier),
+    const publicImports = new Set([
+      "@/features/annotator",
+      "@/features/annotator/styles.css",
+    ]);
+    const violations = dependencies.filter(
+      ({ file, target, specifier }) =>
+        inside(file, appRoot) &&
+        target &&
+        inside(target, resolve(sourceRoot, "features")) &&
+        !publicImports.has(specifier),
     );
     expect(violations.map(report)).toEqual([]);
   });
 
   it("retires loose legacy source files", () => {
-    const legacyFiles = sourceFiles.map((file) => relative(sourceRoot, file)).filter((file) =>
-      /^(?:App\.tsx|main\.tsx|types\.ts|styles\.css)$/.test(file) ||
-      /^(?:components\/[^/]+\.tsx|hooks\/[^/]+\.ts|lib\/[^/]+\.ts)$/.test(file),
-    );
+    const legacyFiles = sourceFiles
+      .map((file) => relative(sourceRoot, file))
+      .filter(
+        (file) =>
+          /^(?:App\.tsx|main\.tsx|types\.ts|styles\.css)$/.test(file) ||
+          /^(?:components\/[^/]+\.tsx|hooks\/[^/]+\.ts|lib\/[^/]+\.ts)$/.test(
+            file,
+          ),
+      );
     expect(legacyFiles).toEqual([]);
   });
 

@@ -1,11 +1,23 @@
-import {useRef,useState,useLayoutEffect,useEffect} from "react";
-import type {Annotation,MapImage,Position} from "../domain/types";
-import {clamp} from "@/shared/lib/math";
-export interface ViewAnchor {x:number;y:number;screenX?:number;screenY?:number}
-export default function useMapViewport(image:MapImage|null,onZoom:(value:number)=>void){
-  const viewport=useRef<HTMLDivElement>(null),stage=useRef<HTMLDivElement>(null);
-  const anchor=useRef<ViewAnchor|null>(null),zoomFrame=useRef<number|null>(null),pendingZoom=useRef<number|null>(null);
-  const [zoom,setZoom]=useState(1),[box,setBox]=useState({width:1,height:1,padding:24});
+import { useRef, useState, useLayoutEffect, useEffect } from "react";
+import type { Annotation, MapImage, Position } from "../domain/types";
+import { clamp } from "@/shared/lib/math";
+export interface ViewAnchor {
+  x: number;
+  y: number;
+  screenX?: number;
+  screenY?: number;
+}
+export default function useMapViewport(
+  image: MapImage | null,
+  onZoom: (value: number) => void,
+) {
+  const viewport = useRef<HTMLDivElement>(null),
+    stage = useRef<HTMLDivElement>(null);
+  const anchor = useRef<ViewAnchor | null>(null),
+    zoomFrame = useRef<number | null>(null),
+    pendingZoom = useRef<number | null>(null);
+  const [zoom, setZoom] = useState(1),
+    [box, setBox] = useState({ width: 1, height: 1, padding: 24 });
   const fit = image
     ? Math.max(
         100,
@@ -19,10 +31,30 @@ export default function useMapViewport(image:MapImage|null,onZoom:(value:number)
     height = image ? (width * image.height) / image.width : 1;
   const marginTop = Math.max(0, (box.height - box.padding - height) / 2);
 
-  function cancelZoom(){if(zoomFrame.current!==null)cancelAnimationFrame(zoomFrame.current);zoomFrame.current=null;pendingZoom.current=null;anchor.current=null;}
-  function requestZoom(value:number,nextAnchor:ViewAnchor){anchor.current=nextAnchor;pendingZoom.current=value;if(zoomFrame.current===null)zoomFrame.current=requestAnimationFrame(()=>{zoomFrame.current=null;if(pendingZoom.current!==null){setZoom(pendingZoom.current);pendingZoom.current=null;}});}
-  useEffect(()=>()=>cancelZoom(),[]);
-  useEffect(()=>{setZoom(1);cancelZoom();viewport.current!.scrollTo(0,0);},[image?.src]);
+  function cancelZoom() {
+    if (zoomFrame.current !== null) cancelAnimationFrame(zoomFrame.current);
+    zoomFrame.current = null;
+    pendingZoom.current = null;
+    anchor.current = null;
+  }
+  function requestZoom(value: number, nextAnchor: ViewAnchor) {
+    anchor.current = nextAnchor;
+    pendingZoom.current = value;
+    if (zoomFrame.current === null)
+      zoomFrame.current = requestAnimationFrame(() => {
+        zoomFrame.current = null;
+        if (pendingZoom.current !== null) {
+          setZoom(pendingZoom.current);
+          pendingZoom.current = null;
+        }
+      });
+  }
+  useEffect(() => () => cancelZoom(), []);
+  useEffect(() => {
+    setZoom(1);
+    cancelZoom();
+    viewport.current!.scrollTo(0, 0);
+  }, [image?.src]);
   useLayoutEffect(() => {
     const element = viewport.current!;
     let frame: number | null = null;
@@ -112,6 +144,16 @@ export default function useMapViewport(image:MapImage|null,onZoom:(value:number)
     },
   };
 
-  return {viewport,stage,width,height,marginTop,zoom,cancelZoom,requestZoom,...controls};
+  return {
+    viewport,
+    stage,
+    width,
+    height,
+    marginTop,
+    zoom,
+    cancelZoom,
+    requestZoom,
+    ...controls,
+  };
 }
 export type MapViewport = ReturnType<typeof useMapViewport>;

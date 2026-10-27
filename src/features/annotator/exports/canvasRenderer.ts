@@ -1,6 +1,12 @@
-import type {Annotation, MapImage, Project} from "../domain/types";
-import {geometry,measure,textLines,arrowHead} from "../domain/annotationGeometry";
-import {reportRows} from "../domain/signalReadings";
+import type { Annotation, MapImage, Project } from "../domain/types";
+import {
+  geometry,
+  measure,
+  textLines,
+  arrowGeometry,
+  gatewayTriangle,
+} from "../domain/annotationGeometry";
+import { reportRows } from "../domain/signalReadings";
 export function drawItem(
   ctx: CanvasRenderingContext2D,
   item: Annotation,
@@ -13,18 +19,27 @@ export function drawItem(
   ctx.strokeStyle = item.color;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  if (item.type === "point") {
+  if (item.type === "point" || item.type === "gateway") {
     ctx.beginPath();
-    ctx.arc(x, y, m, 0, Math.PI * 2);
+    if (item.type === "gateway") {
+      gatewayTriangle(x, y, m).forEach((point, index) =>
+        index ? ctx.lineTo(...point) : ctx.moveTo(...point),
+      );
+      ctx.closePath();
+    } else ctx.arc(x, y, m, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = "#fff";
     ctx.lineWidth = m * 0.13;
     ctx.stroke();
     ctx.fillStyle = "#fff";
-    ctx.font = `750 ${m * (String(item.number).length > 2 ? 0.64 : 0.9)}px system-ui,sans-serif`;
+    ctx.font = `750 ${m * (item.type === "gateway" ? 0.65 : String(item.number).length > 2 ? 0.64 : 0.9)}px system-ui,sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(String(item.number), x, y);
+    ctx.fillText(
+      item.type === "gateway" ? "G" + item.number : String(item.number),
+      x,
+      y,
+    );
   } else if (item.type === "text") {
     ctx.font = `650 ${m}px system-ui,sans-serif`;
     ctx.textBaseline = "alphabetic";
@@ -38,10 +53,13 @@ export function drawItem(
   } else {
     ctx.lineWidth = m;
     ctx.beginPath();
-    points.forEach((p, i) => (i ? ctx.lineTo(...p) : ctx.moveTo(...p)));
+    const arrow = item.type === "arrow" ? arrowGeometry(points, m) : null;
+    const shaft = arrow?.shaft ?? points;
+    ctx.lineCap = arrow ? "butt" : "round";
+    shaft.forEach((p, i) => (i ? ctx.lineTo(...p) : ctx.moveTo(...p)));
     ctx.stroke();
-    if (item.type === "arrow") {
-      const head = arrowHead(points, m);
+    if (arrow) {
+      const head = arrow.head;
       ctx.beginPath();
       head.forEach((p, i) => (i ? ctx.lineTo(...p) : ctx.moveTo(...p)));
       ctx.closePath();
