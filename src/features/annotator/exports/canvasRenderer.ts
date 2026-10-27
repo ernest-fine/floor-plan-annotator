@@ -1,42 +1,6 @@
-import type { Project, MapImage, Annotation } from "../types";
-interface ReportRow {
-  number: number;
-  color: string;
-  name: string;
-  gateway: string;
-  rssi: string;
-  snr: string;
-  notes: string;
-  state: "Complete" | "Partial" | "Not tested";
-}
-import {
-  geometry,
-  measure,
-  textLines,
-  arrowHead,
-  validReading,
-  hasReading,
-} from "./model";
-import { decodeImage } from "./files";
-
-export function fileBase(project: Pick<Project, "title" | "image">) {
-  return (
-    (project.title || project.image?.name || "floor-map")
-      .replace(/\.[a-z0-9]+$/i, "")
-      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
-      .slice(0, 100) || "floor-map"
-  );
-}
-export function download(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob),
-    a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
-}
+import type {Annotation, MapImage, Project} from "../domain/types";
+import {geometry,measure,textLines,arrowHead} from "../domain/annotationGeometry";
+import {reportRows} from "../domain/signalReadings";
 export function drawItem(
   ctx: CanvasRenderingContext2D,
   item: Annotation,
@@ -91,32 +55,7 @@ export function drawItem(
   }
   ctx.restore();
 }
-export function reportRows(project: Project): ReportRow[] {
-  const rows: ReportRow[] = [];
-  project.items
-    .filter((i) => i.type === "point")
-    .forEach((item) => {
-      const readings = item.readings.filter(hasReading);
-      if (!readings.length) readings.push({ gateway: "", rssi: "", snr: "" });
-      readings.forEach((r, index) =>
-        rows.push({
-          number: item.number,
-          color: item.color,
-          name: item.name || "Point " + item.number,
-          gateway: r.gateway,
-          rssi: r.rssi,
-          snr: r.snr,
-          notes: index === 0 ? item.notes : "",
-          state: validReading(r)
-            ? "Complete"
-            : hasReading(r)
-              ? "Partial"
-              : "Not tested",
-        }),
-      );
-    });
-  return rows;
-}
+
 export function wrapCanvas(
   ctx: CanvasRenderingContext2D,
   value: unknown,
@@ -135,6 +74,7 @@ export function wrapCanvas(
   }
   return lines;
 }
+
 export function reportLayout(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -186,6 +126,7 @@ export function reportLayout(
       header + rows.reduce((n, r) => n + r.height, 0) + padding + font * 2,
   };
 }
+
 export function drawReport(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -253,81 +194,4 @@ export function drawReport(
     y + font,
   );
   ctx.restore();
-}
-export async function exportPng(project: Project, includeTable: boolean) {
-  if (!project.image) return;
-  const mapImage = project.image;
-  const image = await decodeImage(mapImage.src),
-    { width: w, height: h } = mapImage;
-  const report = includeTable && project.items.some((i) => i.type === "point");
-  const canvas = document.createElement("canvas");
-  canvas.width = report ? Math.max(1000, w) : w;
-  let ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("This browser could not create the image.");
-  const mapHeight = Math.round((h * canvas.width) / w),
-    layout = report ? reportLayout(ctx, canvas.width, project) : null;
-  const exportHeight = mapHeight + (layout ? Math.ceil(layout.height) : 0);
-  if (
-    canvas.width * exportHeight > 64000000 ||
-    canvas.width > 16000 ||
-    exportHeight > 30000
-  )
-    throw new Error(
-      "This report is too large for one PNG. Uncheck the signal table and download the readings as CSV.",
-    );
-  canvas.height = exportHeight;
-  ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("This browser could not create the image.");
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.save();
-  ctx.scale(canvas.width / w, canvas.width / w);
-  ctx.drawImage(image, 0, 0, w, h);
-  project.items.forEach((item) => drawItem(ctx!, item, mapImage));
-  ctx.restore();
-  if (layout) drawReport(ctx, canvas.width, mapHeight, layout);
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/png"),
-  );
-  if (!blob)
-    throw new Error("The image could not be exported. Try a smaller map.");
-  download(blob, fileBase(project) + "-annotated.png");
-  return { hasTable: !!layout };
-}
-export function exportCsv(project: Project) {
-  const cell = (value: unknown) => {
-    let text = String(value ?? "");
-    if (/^[=+\-@\t\r]/.test(text) && !/^[-+]?\d+(\.\d+)?$/.test(text))
-      text = "'" + text;
-    return '"' + text.replaceAll('"', '""') + '"';
-  };
-  const rows = [
-    [
-      "Point",
-      "Location",
-      "Color",
-      "Gateway",
-      "RSSI (dBm)",
-      "SNR (dB)",
-      "Record",
-      "Notes",
-    ],
-    ...reportRows(project).map((r) => [
-      r.number,
-      r.name,
-      r.color,
-      r.gateway,
-      r.rssi,
-      r.snr,
-      r.state,
-      r.notes,
-    ]),
-  ];
-  download(
-    new Blob(
-      ["\uFEFF" + rows.map((row) => row.map(cell).join(",")).join("\r\n")],
-      { type: "text/csv;charset=utf-8" },
-    ),
-    fileBase(project) + "-readings.csv",
-  );
 }

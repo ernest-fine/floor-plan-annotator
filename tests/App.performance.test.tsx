@@ -2,21 +2,21 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import type { LoadedProject } from "../src/types";
+import type { LoadedProject } from "@/features/annotator/domain/types";
 const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   save: vi.fn(),
   restore: vi.fn(),
 }));
-vi.mock("../src/lib/storage", () => ({
+vi.mock("@/features/annotator/persistence/projectRepository", () => ({
   readSavedProject: mocks.read,
   saveProjectLocally: mocks.save,
 }));
-vi.mock("../src/lib/files", async (original) => ({
-  ...(await original<typeof import("../src/lib/files")>()),
+vi.mock("@/features/annotator/io/projectFiles", async (original) => ({
+  ...(await original<typeof import("@/features/annotator/io/projectFiles")>()),
   restoreProject: mocks.restore,
 }));
-import App from "../src/App";
+import App from "@/app/App";
 let root: Root, host: HTMLDivElement;
 beforeEach(() => {
   vi.useFakeTimers();

@@ -1,5 +1,6 @@
-import type { MapImage, Project } from "../types";
-import { isRecord, newId } from "./model";
+import type { MapImage, Project } from "../domain/types";
+import {isRecord} from "../domain/projectSchema";
+import {newId} from "@/shared/lib/id";
 
 let opening: Promise<IDBDatabase> | undefined;
 let writes: Promise<void> = Promise.resolve();

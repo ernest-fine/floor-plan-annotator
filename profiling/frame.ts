@@ -67,7 +67,7 @@ Element.prototype.setPointerCapture = () => {};
 Element.prototype.releasePointerCapture = () => {};
 Element.prototype.hasPointerCapture = () => false;
 if (new URL(location.href).searchParams.get("restore") === "1") {
-  void import("../src/main");
+  void import("../src/app/main");
 } else
   window.addEventListener(
     "message",
@@ -93,7 +93,7 @@ if (new URL(location.href).searchParams.get("restore") === "1") {
           };
         };
       });
-      await import("../src/main");
+      await import("../src/app/main");
     },
     { once: true },
   );

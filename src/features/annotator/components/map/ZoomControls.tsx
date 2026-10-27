@@ -1,3 +1,5 @@
+import MapControls from "@/shared/ui/MapControls";
+import Button from "@/shared/ui/Button";
 import type { Ref, RefObject } from "react";
 import { useImperativeHandle, useState } from "react";
 import type { MapCanvasHandle } from "./MapCanvas";
@@ -16,29 +18,29 @@ export default function ZoomControls({
   const [zoom, setZoom] = useState(1);
   useImperativeHandle(ref, () => ({ setZoom }), []);
   return (
-    <div className="zoom chrome" role="group" aria-label="Map view">
-      <button
+    <MapControls className="zoom chrome" label="Map view">
+      <Button
         id="zoom-out"
         aria-label="Zoom out"
         disabled={disabled}
         onClick={() => map.current?.zoomBy(-0.5)}
       >
         −
-      </button>
+      </Button>
       <output id="zoom-label" aria-label="Zoom level">
         {Math.round(zoom * 100)}%
       </output>
-      <button
+      <Button
         id="zoom-in"
         aria-label="Zoom in"
         disabled={disabled}
         onClick={() => map.current?.zoomBy(0.5)}
       >
         +
-      </button>
-      <button id="fit" disabled={disabled} onClick={() => map.current?.fit()}>
+      </Button>
+      <Button id="fit" disabled={disabled} onClick={() => map.current?.fit()}>
         Fit
-      </button>
-    </div>
+      </Button>
+    </MapControls>
   );
 }

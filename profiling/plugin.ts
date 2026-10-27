@@ -7,12 +7,12 @@ export default function profilePlugin(): Plugin {
       if (!id.includes("/src/")) return;
       const count = (name: string) =>
         `globalThis.__annotatorProfile?.count('${name}');\n`;
-      if (id.endsWith("/App.tsx"))
+      if (id.endsWith("/features/annotator/pages/AnnotatorPage.tsx"))
         code = code.replace(
-          "export default function App() {",
-          "export default function App() {\n" + count("appRenders"),
+          "export default function AnnotatorPage() {",
+          "export default function AnnotatorPage() {\n" + count("appRenders"),
         );
-      if (id.endsWith("/components/MapCanvas.tsx")) {
+      if (id.endsWith("/components/map/MapCanvas.tsx")) {
         code = code.replace(
           "  const viewport = useRef",
           "  " + count("mapRenders") + "const viewport = useRef",
@@ -26,7 +26,7 @@ export default function profilePlugin(): Plugin {
           "    function resize() {\n" + count("resizeCallbacks"),
         );
       }
-      if (id.endsWith("/components/Panels.tsx")) {
+      if (id.endsWith("/components/panels/AnnotationList.tsx")) {
         const start = code.indexOf("export function AnnotationList(");
         const body = code.indexOf("  return (", start);
         if (start >= 0 && body >= 0)

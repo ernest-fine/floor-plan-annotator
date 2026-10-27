@@ -1,8 +1,11 @@
-import type { Notify, Project, ProjectUpdate, HistoryState } from "../types";
+import type {Project,ProjectUpdate,HistoryState} from "../domain/types";
+import type {Notify} from "@/shared/types/notice";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { emptyProject, historyReducer, isRecord } from "../lib/model";
-import { restoreProject } from "../lib/files";
-import { readSavedProject, saveProjectLocally } from "../lib/storage";
+import {emptyProject} from "../domain/annotations";
+import {historyReducer} from "../domain/documentReducer";
+import {isRecord} from "../domain/projectSchema";
+import { restoreProject } from "../io/projectFiles";
+import { readSavedProject, saveProjectLocally } from "../persistence/projectRepository";
 
 export default function useProject(notify: Notify) {
   const [state, dispatch] = useReducer(

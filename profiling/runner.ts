@@ -1,4 +1,4 @@
-import type { Annotation, Project, Position } from "../src/types";
+import type { Annotation, Project, Position } from "../src/features/annotator/domain/types";
 type Metrics = {
   counts: Record<string, number>;
   puts: {

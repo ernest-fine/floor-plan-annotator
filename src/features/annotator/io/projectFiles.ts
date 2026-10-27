@@ -1,5 +1,6 @@
-import type { LoadedProject } from "../types";
-import { MAX_FILE, MAX_PIXELS, validateProject } from "./model";
+import type { LoadedProject } from "../domain/types";
+import {MAX_FILE, MAX_PIXELS} from "../domain/limits";
+import {validateProject} from "../domain/projectSchema";
 
 export function decodeImage(src: string): Promise<HTMLImageElement> {
   return new Promise<HTMLImageElement>((resolve, reject) => {

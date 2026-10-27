@@ -1,12 +1,13 @@
 import type { Root } from "react-dom/client";
-import type { Annotation, Tool } from "../src/types";
-import type { MapCanvasHandle } from "../src/components/MapCanvas";
+import type {Annotation} from "@/features/annotator/domain/types";
+import type {Tool} from "@/features/annotator/types/editor";
+import type { MapCanvasHandle } from "@/features/annotator/components/map/MapCanvas";
 // @vitest-environment jsdom
 import { act, createRef, Profiler } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import MapCanvas from "../src/components/MapCanvas";
-import { createItem } from "../src/lib/model";
+import MapCanvas from "@/features/annotator/components/map/MapCanvas";
+import {createItem} from "@/features/annotator/domain/annotations";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let root: Root, host: HTMLDivElement;

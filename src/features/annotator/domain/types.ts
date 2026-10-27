@@ -1,9 +1,5 @@
 export type Position = [number, number];
-export type Tool = "select" | "point" | "text" | "arrow" | "pen";
-export type AnnotationType = Exclude<Tool, "select">;
-export type PanelName = "files" | "tools" | "list" | "details" | "export";
-export type Notify = (message: string, error?: boolean) => void;
-
+export type AnnotationType = "point" | "text" | "arrow" | "pen";
 export interface Reading {
   gateway: string;
   rssi: string;

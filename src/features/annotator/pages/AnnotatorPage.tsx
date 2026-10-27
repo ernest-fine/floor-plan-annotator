@@ -1,22 +1,25 @@
-import type { Annotation, AnnotationPatch, PanelName, Tool } from "./types";
+import type {Annotation,AnnotationPatch} from "../domain/types";
+import type {PanelName,Tool} from "../types/editor";
 import { useCallback, useEffect, useRef, useState } from "react";
-import MapCanvas, { type MapCanvasHandle } from "./components/MapCanvas";
-import {
-  AnnotationDetails,
-  AnnotationList,
-  ExportPanel,
-  FilesPanel,
-  ToolsPanel,
-} from "./components/Panels";
+import MapCanvas, { type MapCanvasHandle } from "../components/map/MapCanvas";
+import {AnnotationDetails} from "../components/panels/AnnotationDetails";
+import {AnnotationList} from "../components/panels/AnnotationList";
+import {ExportPanel} from "../components/panels/ExportPanel";
+import {FilesPanel} from "../components/panels/FilesPanel";
+import {ToolsPanel} from "../components/panels/ToolsPanel";
 import ZoomControls, {
   type ZoomControlsHandle,
-} from "./components/ZoomControls";
-import useProject from "./hooks/useProject";
-import { projectFromFile, projectFromImage } from "./lib/files";
-import { download, exportCsv, exportPng, fileBase } from "./lib/exports";
-import { enteredGateways, TOOL_NAMES } from "./lib/model";
+} from "../components/map/ZoomControls";
+import useProject from "../hooks/useProject";
+import { projectFromFile, projectFromImage } from "../io/projectFiles";
+import {download} from "@/shared/lib/download";
+import {exportCsv} from "../exports/csv";
+import {exportPng} from "../exports/png";
+import {fileBase} from "../io/projectFileName";
+import {enteredGateways} from "../domain/signalReadings";
+import {TOOL_NAMES} from "../config/editor";
 
-export default function App() {
+export default function AnnotatorPage() {
   const [notice, setNotice] = useState<{
     message: string;
     error: boolean;

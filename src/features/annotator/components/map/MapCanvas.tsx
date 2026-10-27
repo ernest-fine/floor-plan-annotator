@@ -9,8 +9,8 @@ import type {
   MapImage,
   Position,
   Project,
-  Tool,
-} from "../types";
+} from "../../domain/types";
+import type {Tool} from "../../types/editor";
 export interface MapCanvasHandle {
   zoomBy(delta: number): void;
   fit(): void;
@@ -72,17 +72,11 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  arrowHead,
-  clamp,
-  createItem,
-  describe,
-  geometry,
-  measure,
-  moveItem,
-  newId,
-  textLines,
-} from "../lib/model";
+import {arrowHead,geometry,measure,moveItem,textLines} from "../../domain/annotationGeometry";
+import {createItem} from "../../domain/annotations";
+import {describe} from "../../domain/annotationLabels";
+import {clamp} from "@/shared/lib/math";
+import {newId} from "@/shared/lib/id";
 
 const AnnotationShape = memo(function AnnotationShape({
   item,

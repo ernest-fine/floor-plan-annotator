@@ -1,11 +1,12 @@
 import type { Root } from "react-dom/client";
-import type { DotAnnotation } from "../src/types";
+import type { DotAnnotation } from "@/features/annotator/domain/types";
 // @vitest-environment jsdom
 import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AnnotationDetails } from "../src/components/Panels";
-import { createItem, enteredGateways } from "../src/lib/model";
+import { AnnotationDetails } from "@/features/annotator/components/panels/AnnotationDetails";
+import {createItem} from "@/features/annotator/domain/annotations";
+import {enteredGateways} from "@/features/annotator/domain/signalReadings";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let root: Root, host: HTMLDivElement;

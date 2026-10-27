@@ -4,8 +4,8 @@ import {
   IDBKeyRange as KeyRange,
   IDBObjectStore as FakeStore,
 } from "fake-indexeddb";
-import type { Project } from "../src/types";
-import { createItem } from "../src/lib/model";
+import type { Project } from "@/features/annotator/domain/types";
+import {createItem} from "@/features/annotator/domain/annotations";
 
 function fixture(src = "data:image/png;base64,AAAA"): Project {
   return {
@@ -58,7 +58,7 @@ describe("image-separated autosave", () => {
     const project = fixture();
     await seed(project);
     const { readSavedProject, saveProjectLocally } =
-      await import("../src/lib/storage");
+      await import("@/features/annotator/persistence/projectRepository");
     expect(await readSavedProject()).toEqual(project);
     const edited = { ...project, title: "Edited" };
     await saveProjectLocally(edited);
@@ -67,7 +67,7 @@ describe("image-separated autosave", () => {
   it("writes image bytes once while subsequent edits save only metadata and annotations", async () => {
     const put = vi.spyOn(FakeStore.prototype, "put");
     const { readSavedProject, saveProjectLocally } =
-      await import("../src/lib/storage");
+      await import("@/features/annotator/persistence/projectRepository");
     const project = fixture();
     await saveProjectLocally(project);
     await saveProjectLocally({ ...project, title: "Second" });
@@ -82,7 +82,7 @@ describe("image-separated autosave", () => {
   });
   it("atomically replaces the map and releases the previous image", async () => {
     const { readSavedProject, saveProjectLocally } =
-      await import("../src/lib/storage");
+      await import("@/features/annotator/persistence/projectRepository");
     const first = fixture(),
       second = fixture("data:image/png;base64,BBBB");
     await saveProjectLocally(first);
@@ -103,13 +103,13 @@ describe("image-separated autosave", () => {
       tx.oncomplete = () => resolve();
     });
     db.close();
-    const { saveProjectLocally } = await import("../src/lib/storage");
+    const { saveProjectLocally } = await import("@/features/annotator/persistence/projectRepository");
     await saveProjectLocally(fixture());
     expect(JSON.stringify(await storedValues())).not.toContain("obsolete-");
   });
   it("retains the last saved project if a replacement transaction fails", async () => {
     const { readSavedProject, saveProjectLocally } =
-      await import("../src/lib/storage");
+      await import("@/features/annotator/persistence/projectRepository");
     const first = fixture();
     await saveProjectLocally(first);
     const native = FakeStore.prototype.put;
@@ -133,7 +133,7 @@ describe("image-separated autosave", () => {
   });
   it("preserves save call order and needs no background polling", async () => {
     const { readSavedProject, saveProjectLocally } =
-      await import("../src/lib/storage");
+      await import("@/features/annotator/persistence/projectRepository");
     const first = fixture(),
       last = { ...fixture("data:image/png;base64,DDDD"), title: "Last" };
     await Promise.all([

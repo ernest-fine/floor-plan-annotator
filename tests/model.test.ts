@@ -1,15 +1,12 @@
-import type { DrawingAnnotation, HistoryState } from "../src/types";
+import type { DrawingAnnotation, HistoryState } from "@/features/annotator/domain/types";
 import { describe, it, expect } from "vitest";
-import {
-  emptyProject,
-  createItem,
-  validateProject,
-  validReading,
-  moveItem,
-  historyReducer,
-  arrowHead,
-} from "../src/lib/model";
-import { reportRows, fileBase } from "../src/lib/exports";
+import {emptyProject, createItem} from "@/features/annotator/domain/annotations";
+import {validateProject} from "@/features/annotator/domain/projectSchema";
+import {validReading} from "@/features/annotator/domain/signalReadings";
+import {moveItem, arrowHead} from "@/features/annotator/domain/annotationGeometry";
+import {historyReducer} from "@/features/annotator/domain/documentReducer";
+import {reportRows} from "@/features/annotator/domain/signalReadings";
+import {fileBase} from "@/features/annotator/io/projectFileName";
 
 const point = () => createItem("point", [0.2, 0.3], "#d8322a", 2.8, 1);
 const project = () => ({
