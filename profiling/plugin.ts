@@ -1,42 +1,17 @@
-import type { Plugin } from "vite";
-export default function profilePlugin(): Plugin {
-  return {
-    name: "local-performance-probes",
-    enforce: "pre",
-    transform(code, id) {
-      if (!id.includes("/src/")) return;
-      const count = (name: string) =>
-        `globalThis.__annotatorProfile?.count('${name}');\n`;
-      if (id.endsWith("/features/annotator/pages/AnnotatorPage.tsx"))
-        code = code.replace(
-          "export default function AnnotatorPage() {",
-          "export default function AnnotatorPage() {\n" + count("appRenders"),
-        );
-      if (id.endsWith("/components/map/MapCanvas.tsx")) {
-        code = code.replace(
-          "  const viewport = useRef",
-          "  " + count("mapRenders") + "const viewport = useRef",
-        );
-        code = code.replace(
-          /(  const \{ x, y, points \} = useMemo\()/,
-          "  " + count("shapeRenders") + "$1",
-        );
-        code = code.replace(
-          "    function resize() {",
-          "    function resize() {\n" + count("resizeCallbacks"),
-        );
-      }
-      if (id.endsWith("/components/panels/AnnotationList.tsx")) {
-        const start = code.indexOf("export function AnnotationList(");
-        const body = code.indexOf("  return (", start);
-        if (start >= 0 && body >= 0)
-          code =
-            code.slice(0, body) +
-            "  " +
-            count("listRenders") +
-            code.slice(body);
-      }
-      return { code, map: null };
-    },
-  };
+import type {Plugin} from 'vite';
+export default function profilePlugin():Plugin {
+ const probes:Record<string,[string,string]>={
+  '/features/annotator/pages/AnnotatorPage.tsx':['app-renders','appRenders'],
+  '/features/annotator/components/map/MapCanvas.tsx':['map-renders','mapRenders'],
+  '/features/annotator/components/map/AnnotationLayer.tsx':['shape-renders','shapeRenders'],
+  '/features/annotator/hooks/useMapViewport.ts':['resize-callbacks','resizeCallbacks'],
+  '/features/annotator/components/panels/AnnotationList.tsx':['list-renders','listRenders'],
+ };
+ const observed=new Set<string>();
+ return {name:'local-performance-probes',enforce:'pre',buildStart(){observed.clear();},transform(code,id){
+  const path=Object.keys(probes).find(path=>id.endsWith(path));if(!path)return;
+  const [marker,count]=probes[path],token='// @profile:'+marker;
+  if(!code.includes(token))throw new Error('Missing profile probe: '+path);
+  observed.add(path);return {code:code.replace(token,`globalThis.__annotatorProfile?.count('${count}');`),map:null};
+ },generateBundle(){for(const path of Object.keys(probes))if(!observed.has(path))throw new Error('Profile owner was not instrumented: '+path);}};
 }

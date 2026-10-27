@@ -1,0 +1,33 @@
+.numeric-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.numeric-input > .numeric-input__prefix {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.numeric-input > .numeric-input__control {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 5px;
+  font-size: 16px;
+}
+
+.numeric-input > .numeric-input__sign {
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 20px;
+}

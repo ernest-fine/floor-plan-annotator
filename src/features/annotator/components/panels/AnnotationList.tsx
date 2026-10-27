@@ -18,6 +18,7 @@ export function AnnotationList({
   onClear: () => void;
   onClose: () => void;
 }) {
+  // @profile:list-renders
   return (
     <FloatingPanel
       id="annotation-list-panel"

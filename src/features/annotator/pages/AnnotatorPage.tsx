@@ -1,208 +1,39 @@
-import type {Annotation,AnnotationPatch} from "../domain/types";
-import type {PanelName,Tool} from "../types/editor";
-import { useCallback, useEffect, useRef, useState } from "react";
-import MapCanvas, { type MapCanvasHandle } from "../components/map/MapCanvas";
+import EditorChrome from "../components/workspace/EditorChrome";
+import ProjectFileInputs from "../components/workspace/ProjectFileInputs";
+import {useRef,useCallback} from "react";
+import type {Tool} from "../types/editor";
+import useNotice from "@/shared/hooks/useNotice";
+import MapCanvas,{type MapCanvasHandle} from "../components/map/MapCanvas";
+import ZoomControls,{type ZoomControlsHandle} from "../components/map/ZoomControls";
 import {AnnotationDetails} from "../components/panels/AnnotationDetails";
 import {AnnotationList} from "../components/panels/AnnotationList";
 import {ExportPanel} from "../components/panels/ExportPanel";
 import {FilesPanel} from "../components/panels/FilesPanel";
 import {ToolsPanel} from "../components/panels/ToolsPanel";
-import ZoomControls, {
-  type ZoomControlsHandle,
-} from "../components/map/ZoomControls";
-import useProject from "../hooks/useProject";
-import { projectFromFile, projectFromImage } from "../io/projectFiles";
-import {download} from "@/shared/lib/download";
-import {exportCsv} from "../exports/csv";
-import {exportPng} from "../exports/png";
-import {fileBase} from "../io/projectFileName";
+import useProjectDocument from "../hooks/useProjectDocument";
+import useProjectPersistence from "../hooks/useProjectPersistence";
+import useProjectFiles from "../hooks/useProjectFiles";
+import useProjectExport from "../hooks/useProjectExport";
+import useEditorState from "../hooks/useEditorState";
+import useAnnotationActions from "../hooks/useAnnotationActions";
+import useKeyboardShortcuts from "../hooks/useKeyboardShortcuts";
 import {enteredGateways} from "../domain/signalReadings";
 import {TOOL_NAMES} from "../config/editor";
-
-export default function AnnotatorPage() {
-  const [notice, setNotice] = useState<{
-    message: string;
-    error: boolean;
-  } | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
-  );
-  const notify = useCallback((message: string, error = false) => {
-    clearTimeout(toastTimer.current);
-    setNotice({ message, error });
-    toastTimer.current = setTimeout(() => setNotice(null), error ? 8000 : 3000);
-  }, []);
-  useEffect(() => () => clearTimeout(toastTimer.current), []);
-  const {
-    project,
-    commit,
-    load,
-    revision,
-    saveStatus,
-    storageError,
-    canUndo,
-    canRedo,
-    undo,
-    redo,
-  } = useProject(notify);
-  const [panel, setPanel] = useState<PanelName | null>(null),
-    [hidden, setHidden] = useState(false),
-    [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tool, setTool] = useState<Tool>("select"),
-    [color, setColor] = useState("#d8322a"),
-    [size, setSize] = useState(2.6),
-    [includeTable, setIncludeTable] = useState(true),
-    [busy, setBusy] = useState(false);
-  const map = useRef<MapCanvasHandle>(null),
-    imageInput = useRef<HTMLInputElement>(null),
-    projectInput = useRef<HTMLInputElement>(null),
-    imports = useRef(0);
-  const zoomControls = useRef<ZoomControlsHandle>(null);
-  const reportZoom = useCallback(
-    (zoom: number) => zoomControls.current?.setZoom(zoom),
-    [],
-  );
-  const item = project.items.find((item) => item.id === selectedId);
-  const close = () => setPanel(null);
-  const toggle = (name: PanelName) =>
-    setPanel((value) => (value === name ? null : name));
-  function chooseTool(value: Tool) {
-    map.current?.cancel();
-    setTool(value);
-    if (panel !== "tools") close();
-  }
-  function historyAction(action: () => void) {
-    map.current?.cancel();
-    action();
-    setSelectedId(null);
-    close();
-  }
-  function removeSelected() {
-    if (!item) return;
-    commit((project) => ({
-      ...project,
-      items: project.items.filter((saved) => saved.id !== item.id),
-    }));
-    setSelectedId(null);
-    close();
-  }
-  function updateItem(patch: AnnotationPatch) {
-    if (!item) return;
-    commit((project) => ({
-      ...project,
-      items: project.items.map((saved) =>
-        saved.id === item.id ? { ...saved, ...patch } : saved,
-      ),
-    }));
-  }
-  function addItem(next: Annotation) {
-    if (project.items.length >= 3000) {
-      notify("Annotation limit: 3000.", true);
-      return;
-    }
-    commit((project) => ({
-      ...project,
-      items: [...project.items, next],
-      nextNumber:
-        next.type === "point" ? project.nextNumber + 1 : project.nextNumber,
-    }));
-    setSelectedId(next.id);
-    setPanel(next.type === "text" ? "details" : null);
-  }
-  async function importFile(file: File | undefined, isProject: boolean) {
-    if (!file || busy) return;
-    const request = ++imports.current;
-    revision.current++;
-    try {
-      const next = await (isProject
-        ? projectFromFile(file)
-        : projectFromImage(file));
-      if (request !== imports.current) return;
-      if (
-        project.image &&
-        !confirm(
-          "Replace the current map and annotations? Save project first if you need a backup.",
-        )
-      )
-        return;
-      load(next);
-      setSelectedId(null);
-      close();
-      setTool("select");
-      notify(isProject ? "Project loaded." : "Map loaded.");
-    } catch (error) {
-      notify(error instanceof Error ? error.message : String(error), true);
-    }
-  }
-  function saveProject() {
-    if (!project.image) return;
-    download(
-      new Blob([JSON.stringify(project)], { type: "application/json" }),
-      fileBase(project) + ".floor-map.json",
-    );
-    notify("Project JSON downloaded.");
-    close();
-  }
-  async function png() {
-    if (!project.image || busy) return;
-    setBusy(true);
-    notify("Exporting PNG…");
-    try {
-      await exportPng(project, includeTable);
-      notify("PNG downloaded.");
-    } catch (error) {
-      notify(error instanceof Error ? error.message : String(error), true);
-    } finally {
-      setBusy(false);
-    }
-  }
-  useEffect(() => {
-    function keyDown(event: KeyboardEvent) {
-      if (
-        event.target instanceof Element &&
-        event.target.closest("input,textarea,select,[contenteditable=true]")
-      )
-        return;
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
-        event.preventDefault();
-        historyAction(event.shiftKey ? redo : undo);
-        return;
-      }
-      if ((event.key === "Delete" || event.key === "Backspace") && item) {
-        event.preventDefault();
-        removeSelected();
-        return;
-      }
-      if (event.key === "Escape") {
-        map.current?.cancel();
-        close();
-        setSelectedId(null);
-        setTool("select");
-        return;
-      }
-      if (!event.ctrlKey && !event.metaKey && !event.altKey) {
-        const shortcuts: Partial<Record<string, Tool>> = {
-          v: "select",
-          d: "point",
-          t: "text",
-          a: "arrow",
-          p: "pen",
-        };
-        const next = shortcuts[event.key.toLowerCase()];
-        if (next) chooseTool(next);
-      }
-    }
-    document.addEventListener("keydown", keyDown);
-    return () => document.removeEventListener("keydown", keyDown);
-  });
-  const chooseImage = () => {
-    close();
-    imageInput.current!.click();
-  };
-  const chooseProject = () => {
-    close();
-    projectInput.current!.click();
-  };
+export default function AnnotatorPage(){
+  // @profile:app-renders
+  const {notice,notify}=useNotice();
+  const document=useProjectDocument(),ui=useEditorState();
+  const {project,canUndo,canRedo,undo,redo}=document;
+  const {saveStatus,storageError}=useProjectPersistence(document,notify);
+  const exports=useProjectExport(document,notify,ui.includeTable),{busy}=exports;
+  const files=useProjectFiles(document,notify,ui.imported,ui.close,busy);
+  const annotations=useAnnotationActions(document,ui,notify),{item}=annotations;
+  const {panel,hidden,selectedId,tool,color,size,includeTable,close,toggle,setHidden,setPanel,setSelectedId,setTool,setColor,setSize,setIncludeTable}=ui;
+  const map=useRef<MapCanvasHandle>(null),zoomControls=useRef<ZoomControlsHandle>(null);
+  const reportZoom=useCallback((value:number)=>zoomControls.current?.setZoom(value),[]);
+  function chooseTool(value:Tool){map.current?.cancel();setTool(value);if(panel!=="tools")close();}
+  function historyAction(action:()=>void){map.current?.cancel();action();setSelectedId(null);close();}
+  useKeyboardShortcuts({undo:()=>historyAction(undo),redo:()=>historyAction(redo),remove:annotations.remove,escape:()=>{map.current?.cancel();ui.select(null);setTool("select");},chooseTool,canRemove:!!item});
   return (
     <div
       className={`workspace ${panel ? panel + "-open" : ""} ${hidden ? "clean-view" : ""}`}
@@ -218,55 +49,20 @@ export default function AnnotatorPage() {
         busy={busy}
         onZoom={reportZoom}
         onInteract={close}
-        onChooseImage={chooseImage}
-        onUpload={(file) => importFile(file, false)}
-        onAdd={addItem}
-        onMove={(next) =>
-          commit((project) => ({
-            ...project,
-            items: project.items.map((saved) =>
-              saved.id === next.id ? next : saved,
-            ),
-          }))
-        }
-        onSelect={(id, open) => {
-          setSelectedId(id);
-          setPanel(open ? "details" : null);
-        }}
+        onChooseImage={files.chooseImage}
+        onUpload={files.upload}
+        onAdd={annotations.add}
+        onMove={annotations.move}
+        onSelect={ui.select}
       />
-      <div className="top-controls chrome">
-        <button
-          id="files-toggle"
-          aria-expanded={panel === "files"}
-          aria-controls="file-actions"
-          onClick={() => toggle("files")}
-        >
-          Files ▾
-        </button>
-        <button
-          id="tools-toggle"
-          aria-expanded={panel === "tools"}
-          aria-controls="tool-panel"
-          onClick={() => toggle("tools")}
-        >
-          {TOOL_NAMES[tool]} ▾
-        </button>
-        <button
-          id="mobile-list"
-          aria-expanded={panel === "list"}
-          aria-controls="annotation-list-panel"
-          onClick={() => toggle("list")}
-        >
-          Annotations <span id="mobile-count">{project.items.length}</span>
-        </button>
-      </div>
+      <EditorChrome ui={ui} map={map} zoomControls={zoomControls} count={project.items.length} hasImage={!!project.image} hasSelection={!!item} busy={busy} canUndo={canUndo} canRedo={canRedo} onUndo={()=>historyAction(undo)} onRedo={()=>historyAction(redo)}/>
       {panel === "files" && (
         <FilesPanel
           project={project}
           onClose={close}
-          onImage={chooseImage}
-          onOpen={chooseProject}
-          onSave={saveProject}
+          onImage={files.chooseImage}
+          onOpen={files.chooseProject}
+          onSave={files.save}
           saveStatus={saveStatus}
           storageError={storageError}
           busy={busy}
@@ -283,77 +79,14 @@ export default function AnnotatorPage() {
           onClose={close}
         />
       )}
-      <div
-        className="history-controls chrome"
-        role="group"
-        aria-label="Edit history"
-      >
-        <button
-          id="undo"
-          aria-label="Undo"
-          title="Undo (Ctrl/⌘ Z)"
-          disabled={!canUndo || busy}
-          onClick={() => historyAction(undo)}
-        >
-          ↶
-        </button>
-        <button
-          id="redo"
-          aria-label="Redo"
-          title="Redo (Ctrl/⌘ Shift Z)"
-          disabled={!canRedo || busy}
-          onClick={() => historyAction(redo)}
-        >
-          ↷
-        </button>
-      </div>
-      <div className="bottom-left chrome">
-        <button
-          id="export-toggle"
-          aria-expanded={panel === "export"}
-          aria-controls="export-panel"
-          onClick={() => toggle("export")}
-        >
-          Export ▴
-        </button>
-      </div>
-      <button
-        id="mobile-details"
-        className="details-toggle chrome"
-        disabled={!item}
-        aria-expanded={panel === "details"}
-        aria-controls="details-panel"
-        onClick={() => toggle("details")}
-      >
-        Details
-      </button>
-      <ZoomControls ref={zoomControls} map={map} disabled={!project.image} />
-      <button
-        id="hide-controls"
-        className="hide-toggle chrome"
-        onClick={() => {
-          close();
-          setHidden(true);
-        }}
-      >
-        Hide controls
-      </button>
-      {hidden && (
-        <button id="show-controls" onClick={() => setHidden(false)}>
-          Show controls
-        </button>
-      )}
       {panel === "export" && (
         <ExportPanel
           project={project}
           includeTable={includeTable}
           onTable={setIncludeTable}
-          onTitle={(title) => commit((project) => ({ ...project, title }))}
-          onPng={png}
-          onCsv={() => {
-            exportCsv(project);
-            notify("CSV downloaded.");
-          }}
+          onTitle={annotations.title}
+          onPng={exports.png}
+          onCsv={exports.csv}
           onClose={close}
           busy={busy}
         />
@@ -364,8 +97,8 @@ export default function AnnotatorPage() {
             item={item}
             gatewayNames={enteredGateways(project.items)}
             open={panel === "details"}
-            onUpdate={updateItem}
-            onDelete={removeSelected}
+            onUpdate={annotations.update}
+            onDelete={annotations.remove}
             onClose={close}
           />
         )}
@@ -378,16 +111,7 @@ export default function AnnotatorPage() {
               setPanel("details");
               map.current?.reveal(item);
             }}
-            onClear={() => {
-              if (
-                confirm(
-                  "Clear all annotations and readings? You can undo this.",
-                )
-              ) {
-                commit((project) => ({ ...project, items: [], nextNumber: 1 }));
-                setSelectedId(null);
-              }
-            }}
+            onClear={annotations.clear}
             onClose={close}
           />
         )}
@@ -402,28 +126,7 @@ export default function AnnotatorPage() {
           {notice?.message}
         </span>
       </div>
-      <input
-        id="image-file"
-        ref={imageInput}
-        type="file"
-        accept="image/jpeg,image/png,.jpg,.jpeg,.png"
-        aria-label="Choose floor plan image"
-        onChange={(event) => {
-          importFile(event.target.files?.[0], false);
-          event.target.value = "";
-        }}
-      />
-      <input
-        id="project-file"
-        ref={projectInput}
-        type="file"
-        accept="application/json,.json"
-        aria-label="Choose saved project"
-        onChange={(event) => {
-          importFile(event.target.files?.[0], true);
-          event.target.value = "";
-        }}
-      />
+      <ProjectFileInputs files={files}/>
     </div>
   );
 }
