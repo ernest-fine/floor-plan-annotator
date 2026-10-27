@@ -1,3 +1,61 @@
+import type {
+  Ref,
+  PointerEvent as ReactPointerEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+} from "react";
+import type {
+  Annotation,
+  DrawingAnnotation,
+  MapImage,
+  Position,
+  Project,
+  Tool,
+} from "../types";
+export interface MapCanvasHandle {
+  zoomBy(delta: number): void;
+  fit(): void;
+  cancel(): void;
+  reveal(item: Annotation): void;
+}
+export interface MapCanvasProps {
+  ref?: Ref<MapCanvasHandle>;
+  project: Project;
+  selectedId: string | null;
+  tool: Tool;
+  color: string;
+  size: number;
+  busy: boolean;
+  onAdd(item: Annotation): void;
+  onMove(item: Annotation): void;
+  onSelect(id: string | null, open: boolean): void;
+  onInteract(): void;
+  onUpload(file: File | undefined): void;
+  onChooseImage(): void;
+  onZoom(zoom: number): void;
+}
+type Gesture =
+  | {
+      kind: "move";
+      original: Annotation;
+      start: Position;
+      screen: Position;
+      moved: boolean;
+    }
+  | { kind: "pan"; screen: Position; scroll: Position }
+  | { kind: "place"; start: Position; screen: Position; tool: "point" | "text" }
+  | { kind: "draw"; screen: Position; moved: boolean };
+interface Anchor {
+  x: number;
+  y: number;
+  screenX?: number;
+  screenY?: number;
+}
+interface Pinch {
+  distance: number;
+  zoom: number;
+  x: number;
+  y: number;
+}
 import {
   memo,
   useEffect,
@@ -16,7 +74,7 @@ import {
   moveItem,
   newId,
   textLines,
-} from "../lib/model.js";
+} from "../lib/model";
 
 const AnnotationShape = memo(function AnnotationShape({
   item,
@@ -24,6 +82,12 @@ const AnnotationShape = memo(function AnnotationShape({
   scale,
   selected,
   draft,
+}: {
+  item: Annotation;
+  image: MapImage;
+  scale: number;
+  selected: boolean;
+  draft: boolean;
 }) {
   const { x, y, points } = geometry(item, image);
   const m =
@@ -35,7 +99,7 @@ const AnnotationShape = memo(function AnnotationShape({
       : measure(item, image.width);
   const common = {
     "data-id": item.id,
-    role: "button",
+    role: "button" as const,
     tabIndex: draft ? -1 : 0,
     "aria-label": describe(item),
     "aria-pressed": selected,
@@ -181,17 +245,17 @@ export default function MapCanvas({
   onUpload,
   onChooseImage,
   onZoom,
-}) {
-  const viewport = useRef(null),
-    stage = useRef(null),
-    overlay = useRef(null);
-  const gesture = useRef(null),
-    previewRef = useRef(null),
-    anchor = useRef(null);
-  const touches = useRef(new Map()),
-    pinch = useRef(null),
+}: MapCanvasProps) {
+  const viewport = useRef<HTMLDivElement>(null),
+    stage = useRef<HTMLDivElement>(null),
+    overlay = useRef<SVGSVGElement>(null);
+  const gesture = useRef<Gesture | null>(null),
+    previewRef = useRef<Annotation | null>(null),
+    anchor = useRef<Anchor | null>(null);
+  const touches = useRef(new Map<number, Position>()),
+    pinch = useRef<Pinch | null>(null),
     suppressTouch = useRef(false);
-  const [preview, setPreview] = useState(null),
+  const [preview, setPreview] = useState<Annotation | null>(null),
     [zoom, setZoom] = useState(1),
     [box, setBox] = useState({ width: 1, height: 1, padding: 24 }),
     [dropping, setDropping] = useState(false);
@@ -209,12 +273,12 @@ export default function MapCanvas({
     height = image ? (width * image.height) / image.width : 1;
   const marginTop = Math.max(0, (box.height - box.padding - height) / 2);
 
-  function showPreview(item) {
+  function showPreview(item: Annotation | null) {
     previewRef.current = item;
     setPreview(item);
   }
   useLayoutEffect(() => {
-    const element = viewport.current;
+    const element = viewport.current!;
     function resize() {
       setBox({
         width: element.clientWidth,
@@ -231,16 +295,16 @@ export default function MapCanvas({
     setZoom(1);
     showPreview(null);
     gesture.current = null;
-    viewport.current.scrollTo(0, 0);
+    viewport.current!.scrollTo(0, 0);
   }, [image?.src]);
   useEffect(() => {
     onZoom(zoom);
   }, [zoom, onZoom]);
   useLayoutEffect(() => {
-    if (!anchor.current || !stage.current) return;
+    if (!anchor.current || !stage.current!) return;
     const { x, y } = anchor.current,
-      view = viewport.current,
-      map = stage.current;
+      view = viewport.current!,
+      map = stage.current!;
     view.scrollTo(
       x * map.clientWidth +
         map.offsetLeft -
@@ -252,10 +316,10 @@ export default function MapCanvas({
     anchor.current = null;
   }, [width, height]);
   useImperativeHandle(ref, () => ({
-    zoomBy(delta) {
-      if (!stage.current) return;
-      const view = viewport.current,
-        map = stage.current;
+    zoomBy(delta: number) {
+      if (!stage.current!) return;
+      const view = viewport.current!,
+        map = stage.current!;
       anchor.current = {
         x:
           (view.scrollLeft + view.clientWidth / 2 - map.offsetLeft) /
@@ -269,49 +333,50 @@ export default function MapCanvas({
     fit() {
       anchor.current = null;
       setZoom(1);
-      viewport.current.scrollTo(0, 0);
+      viewport.current!.scrollTo(0, 0);
     },
     cancel() {
       gesture.current = null;
       showPreview(null);
     },
-    reveal(item) {
-      if (!stage.current) return;
-      const point = item.points?.[0] || [item.x, item.y];
-      viewport.current.scrollTo({
+    reveal(item: Annotation) {
+      if (!stage.current!) return;
+      const point: Position =
+        "points" in item ? item.points[0] : [item.x, item.y];
+      viewport.current!.scrollTo({
         left:
-          point[0] * stage.current.clientWidth +
-          stage.current.offsetLeft -
-          viewport.current.clientWidth / 2,
+          point[0] * stage.current!.clientWidth +
+          stage.current!.offsetLeft -
+          viewport.current!.clientWidth / 2,
         top:
-          point[1] * stage.current.clientHeight +
-          stage.current.offsetTop -
-          viewport.current.clientHeight / 2,
+          point[1] * stage.current!.clientHeight +
+          stage.current!.offsetTop -
+          viewport.current!.clientHeight / 2,
         behavior: "smooth",
       });
     },
   }));
 
-  function position(event) {
-    const rect = overlay.current.getBoundingClientRect();
+  function position(event: { clientX: number; clientY: number }): Position {
+    const rect = overlay.current!.getBoundingClientRect();
     return [
       clamp((event.clientX - rect.left) / rect.width),
       clamp((event.clientY - rect.top) / rect.height),
     ];
   }
-  function pointerDown(event) {
+  function pointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (!image || busy || event.button !== 0) return;
     if (event.pointerType === "touch") {
       touches.current.set(event.pointerId, [event.clientX, event.clientY]);
-      viewport.current.setPointerCapture(event.pointerId);
+      viewport.current!.setPointerCapture(event.pointerId);
       if (touches.current.size >= 2) {
         event.preventDefault();
         gesture.current = null;
         showPreview(null);
         suppressTouch.current = true;
         const [a, b] = [...touches.current.values()];
-        const view = viewport.current,
-          map = stage.current,
+        const view = viewport.current!,
+          map = stage.current!,
           rect = view.getBoundingClientRect();
         const screenX = (a[0] + b[0]) / 2 - rect.left,
           screenY = (a[1] + b[1]) / 2 - rect.top;
@@ -326,7 +391,7 @@ export default function MapCanvas({
       if (suppressTouch.current) return;
     } else if (!event.isPrimary) return;
     onInteract();
-    const bounds = overlay.current.getBoundingClientRect();
+    const bounds = overlay.current!.getBoundingClientRect();
     if (
       tool !== "select" &&
       (event.clientX < bounds.left ||
@@ -336,8 +401,11 @@ export default function MapCanvas({
     )
       return;
     const point = position(event),
-      target = event.target.closest("[data-id]");
-    const screen = [event.clientX, event.clientY];
+      target =
+        event.target instanceof Element
+          ? event.target.closest<SVGGElement>("[data-id]")
+          : null;
+    const screen: Position = [event.clientX, event.clientY];
     if (target && (tool === "select" || tool === "point")) {
       const item = project.items.find((item) => item.id === target.dataset.id);
       if (!item) return;
@@ -354,30 +422,30 @@ export default function MapCanvas({
       gesture.current = {
         kind: "pan",
         screen,
-        scroll: [viewport.current.scrollLeft, viewport.current.scrollTop],
+        scroll: [viewport.current!.scrollLeft, viewport.current!.scrollTop],
       };
     } else if (tool === "point" || tool === "text") {
-      gesture.current = { kind: "place", start: point, screen };
+      gesture.current = { kind: "place", start: point, screen, tool };
     } else {
-      const item = {
+      const item: DrawingAnnotation = {
         id: newId(),
         type: tool,
         color,
         size,
-        points: tool === "pen" ? [point] : [point, point.slice()],
+        points: tool === "pen" ? [point] : [point, [point[0], point[1]]],
       };
       showPreview(item);
       gesture.current = { kind: "draw", screen, moved: false };
     }
-    viewport.current.setPointerCapture(event.pointerId);
+    viewport.current!.setPointerCapture(event.pointerId);
     event.preventDefault();
   }
-  function pointerMove(event) {
+  function pointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.pointerType === "touch" && touches.current.has(event.pointerId))
       touches.current.set(event.pointerId, [event.clientX, event.clientY]);
     if (pinch.current && touches.current.size >= 2) {
       const [a, b] = [...touches.current.values()],
-        rect = viewport.current.getBoundingClientRect();
+        rect = viewport.current!.getBoundingClientRect();
       anchor.current = {
         x: pinch.current.x,
         y: pinch.current.y,
@@ -404,9 +472,9 @@ export default function MapCanvas({
         event.clientY - current.screen[1],
       );
     if (current.kind === "pan") {
-      viewport.current.scrollLeft =
+      viewport.current!.scrollLeft =
         current.scroll[0] + current.screen[0] - event.clientX;
-      viewport.current.scrollTop =
+      viewport.current!.scrollTop =
         current.scroll[1] + current.screen[1] - event.clientY;
     } else if (current.kind === "move") {
       if (!current.moved && distance < 4) return;
@@ -421,11 +489,12 @@ export default function MapCanvas({
     } else if (current.kind === "draw") {
       current.moved ||= distance >= 4;
       const item = previewRef.current;
+      if (!item || !("points" in item)) return;
       if (item.type === "arrow")
         showPreview({ ...item, points: [item.points[0], point] });
       else {
-        const last = item.points.at(-1),
-          rect = overlay.current.getBoundingClientRect();
+        const last = item.points[item.points.length - 1],
+          rect = overlay.current!.getBoundingClientRect();
         if (
           item.points.length < 3000 &&
           Math.hypot(
@@ -437,7 +506,7 @@ export default function MapCanvas({
       }
     }
   }
-  function pointerUp(event) {
+  function pointerUp(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.pointerType === "touch") {
       touches.current.delete(event.pointerId);
       if (suppressTouch.current) {
@@ -445,8 +514,8 @@ export default function MapCanvas({
         gesture.current = null;
         showPreview(null);
         if (!touches.current.size) suppressTouch.current = false;
-        if (viewport.current.hasPointerCapture(event.pointerId))
-          viewport.current.releasePointerCapture(event.pointerId);
+        if (viewport.current!.hasPointerCapture(event.pointerId))
+          viewport.current!.releasePointerCapture(event.pointerId);
         return;
       }
     }
@@ -460,7 +529,15 @@ export default function MapCanvas({
         event.clientY - current.screen[1],
       ) < 8
     ) {
-      onAdd(createItem(tool, current.start, color, size, project.nextNumber));
+      onAdd(
+        createItem(
+          current.tool,
+          current.start,
+          color,
+          size,
+          project.nextNumber,
+        ),
+      );
     } else if (
       current.kind === "draw" &&
       previewRef.current &&
@@ -472,11 +549,14 @@ export default function MapCanvas({
       else onSelect(current.original.id, true);
     }
     showPreview(null);
-    if (viewport.current.hasPointerCapture(event.pointerId))
-      viewport.current.releasePointerCapture(event.pointerId);
+    if (viewport.current!.hasPointerCapture(event.pointerId))
+      viewport.current!.releasePointerCapture(event.pointerId);
   }
-  function keyDown(event) {
-    const target = event.target.closest("[data-id]"),
+  function keyDown(event: ReactKeyboardEvent<SVGSVGElement>) {
+    const target =
+        event.target instanceof Element
+          ? event.target.closest<SVGGElement>("[data-id]")
+          : null,
       item = project.items.find((item) => item.id === target?.dataset.id);
     if (!item) return;
     if (event.key === "Enter" || event.key === " ") {
@@ -484,12 +564,13 @@ export default function MapCanvas({
       onSelect(item.id, true);
       return;
     }
-    const direction = {
+    const directions: Partial<Record<string, Position>> = {
       ArrowLeft: [-1, 0],
       ArrowRight: [1, 0],
       ArrowUp: [0, -1],
       ArrowDown: [0, 1],
-    }[event.key];
+    };
+    const direction = directions[event.key];
     if (direction) {
       event.preventDefault();
       event.stopPropagation();

@@ -1,13 +1,15 @@
+import type { Root } from "react-dom/client";
+import type { DotAnnotation } from "../src/types";
 // @vitest-environment jsdom
 import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AnnotationDetails } from "../src/components/Panels.jsx";
-import { createItem, enteredGateways } from "../src/lib/model.js";
+import { AnnotationDetails } from "../src/components/Panels";
+import { createItem, enteredGateways } from "../src/lib/model";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-let root, host;
-function Harness({ initialItems }) {
+let root: Root, host: HTMLDivElement;
+function Harness({ initialItems }: { initialItems: DotAnnotation[] }) {
   const [items, setItems] = useState(initialItems);
   const [selected, setSelected] = useState(0);
   const item = items[selected];
@@ -55,25 +57,29 @@ afterEach(async () => {
 async function render(items = fixtures()) {
   await act(() => root.render(<Harness initialItems={items} />));
 }
-async function click(element) {
+async function click(element: Element | null) {
+  if (!(element instanceof HTMLElement))
+    throw new Error("Missing test control");
   await act(() => element.click());
 }
 const inputs = () =>
   [...host.querySelectorAll("#reading-rows tr")].map((row) =>
-    [...row.querySelectorAll("input")].map((input) => input.value),
+    [...row.querySelectorAll<HTMLInputElement>("input")].map(
+      (input) => input.value,
+    ),
   );
 
 describe("gateway shortcuts", () => {
   it("shows unique gateway names entered across all map points", async () => {
     await render();
     expect(
-      [...host.querySelectorAll(".gateway-pill")].map(
+      [...host.querySelectorAll<HTMLButtonElement>(".gateway-pill")].map(
         (button) => button.textContent,
       ),
     ).toEqual(["GW North", "GW South"]);
     await click(host.querySelector("#switch-point"));
     expect(
-      [...host.querySelectorAll(".gateway-pill")].map(
+      [...host.querySelectorAll<HTMLButtonElement>(".gateway-pill")].map(
         (button) => button.textContent,
       ),
     ).toEqual(["GW North", "GW South"]);
@@ -87,7 +93,7 @@ describe("gateway shortcuts", () => {
       [" GW North ", "-85", "1.5"],
       ["GW South", "", ""],
     ]);
-    expect(document.activeElement.getAttribute("aria-label")).toBe(
+    expect(document.activeElement!.getAttribute("aria-label")).toBe(
       "RSSI reading 3",
     );
     await click(pill);
@@ -95,7 +101,7 @@ describe("gateway shortcuts", () => {
       ["GW South", "", ""],
       ["GW South", "", ""],
     ]);
-    expect(document.activeElement.getAttribute("aria-label")).toBe(
+    expect(document.activeElement!.getAttribute("aria-label")).toBe(
       "RSSI reading 4",
     );
   });
@@ -116,10 +122,14 @@ describe("gateway shortcuts", () => {
       snr: "",
     }));
     await render(items);
-    const pills = [...host.querySelectorAll(".gateway-pill")];
+    const pills = [
+      ...host.querySelectorAll<HTMLButtonElement>(".gateway-pill"),
+    ];
     expect(pills.map((button) => button.textContent)).toEqual(["GW South"]);
     expect(pills[0].disabled).toBe(true);
-    expect(host.querySelector("#add-reading").disabled).toBe(true);
+    expect(
+      host.querySelector<HTMLButtonElement>("#add-reading")!.disabled,
+    ).toBe(true);
     await click(pills[0]);
     expect(inputs()).toHaveLength(300);
   });

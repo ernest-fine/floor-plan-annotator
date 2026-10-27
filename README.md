@@ -1,6 +1,6 @@
 # Floor Plan Annotator
 
-React application for technicians to annotate floor plans and record manual gateway signal readings.
+React + TypeScript application for technicians to annotate floor plans and record manual gateway signal readings.
 
 **Live:** https://ernest-fine.github.io/floor-plan-annotator/
 
@@ -13,7 +13,7 @@ npm ci
 npm run dev
 ```
 
-Open the URL printed by Vite. Use `npm test` for project/geometry/history and touch-gesture tests, `npm run build` for production, and `npm run preview` to inspect the production build.
+Open the URL printed by Vite. Use `npm run typecheck` for strict TypeScript checks, `npm test` for project/geometry/history and touch-gesture tests, `npm run build` for a type-checked production build, and `npm run preview` to inspect the production build.
 
 ## Features
 
@@ -28,9 +28,9 @@ Images and readings stay on the device. Input limits: 25 MB / 24 megapixels. Sav
 
 ## Source
 
-- `src/App.jsx`: application state and commands.
+- `src/App.tsx`: application state and commands.
 - `src/components/`: map interaction, SVG annotations, and floating panels.
-- `src/hooks/useProject.js`: undo/redo and browser persistence.
+- `src/hooks/useProject.ts`: undo/redo and browser persistence.
 - `src/lib/`: project schema, geometry, files, IndexedDB, and image/CSV export.
 - `tests/`: project compatibility, signal values, history, pin sizing, and pinch gesture regression tests.
 

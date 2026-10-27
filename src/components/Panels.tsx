@@ -1,3 +1,12 @@
+import type { CSSProperties, ReactNode } from "react";
+import type {
+  Annotation,
+  AnnotationPatch,
+  Project,
+  Reading,
+  Tool,
+  Position,
+} from "../types";
 import { useEffect, useRef } from "react";
 import {
   blankReading,
@@ -8,8 +17,17 @@ import {
   TOOL_NAMES,
   validReading,
   hasReading,
-} from "../lib/model.js";
+} from "../lib/model";
 
+interface PanelProps {
+  id: string;
+  className: string;
+  title: string;
+  closeLabel: string;
+  onClose: () => void;
+  actions?: ReactNode;
+  children: ReactNode;
+}
 function Panel({
   id,
   className,
@@ -18,7 +36,7 @@ function Panel({
   onClose,
   actions,
   children,
-}) {
+}: PanelProps) {
   return (
     <section
       id={id}
@@ -52,6 +70,15 @@ export function FilesPanel({
   saveStatus,
   storageError,
   busy,
+}: {
+  project: Project;
+  onClose: () => void;
+  onImage: () => void;
+  onOpen: () => void;
+  onSave: () => void;
+  saveStatus: string;
+  storageError: boolean;
+  busy: boolean;
 }) {
   return (
     <Panel
@@ -101,7 +128,7 @@ export function FilesPanel({
   );
 }
 
-const ICONS = {
+const ICONS: Record<Tool, string> = {
   select: "m5 3 14 10-7 1-3 7-4-18Z",
   point: "M12 2v3m0 14v3M2 12h3m14 0h3",
   text: "M4 6V4h16v2M12 4v16m-4 0h8",
@@ -116,6 +143,14 @@ export function ToolsPanel({
   size,
   onSize,
   onClose,
+}: {
+  tool: Tool;
+  onTool: (tool: Tool) => void;
+  color: string;
+  onColor: (color: string) => void;
+  size: number;
+  onSize: (size: number) => void;
+  onClose: () => void;
 }) {
   return (
     <Panel
@@ -126,27 +161,29 @@ export function ToolsPanel({
       onClose={onClose}
     >
       <div className="tools" role="group" aria-label="Annotation tools">
-        {Object.entries(TOOL_NAMES).map(([key, label]) => (
-          <button
-            key={key}
-            className="tool"
-            data-tool={key}
-            aria-pressed={tool === key}
-            onClick={() => onTool(key)}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              aria-hidden="true"
+        {(Object.entries(TOOL_NAMES) as [Tool, string][]).map(
+          ([key, label]) => (
+            <button
+              key={key}
+              className="tool"
+              data-tool={key}
+              aria-pressed={tool === key}
+              onClick={() => onTool(key)}
             >
-              <path d={ICONS[key]} />
-              {key === "point" && <circle cx="12" cy="12" r="6" />}
-            </svg>
-            {label}
-          </button>
-        ))}
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                aria-hidden="true"
+              >
+                <path d={ICONS[key]} />
+                {key === "point" && <circle cx="12" cy="12" r="6" />}
+              </svg>
+              {label}
+            </button>
+          ),
+        )}
       </div>
       <div className="settings">
         <span className="small muted">Color</span>
@@ -160,7 +197,7 @@ export function ToolsPanel({
             <button
               key={value}
               className="swatch"
-              style={{ "--swatch": value }}
+              style={{ "--swatch": value } as CSSProperties}
               aria-label={label}
               aria-pressed={value === color}
               onClick={() => onColor(value)}
@@ -221,6 +258,15 @@ export function ExportPanel({
   onCsv,
   onClose,
   busy,
+}: {
+  project: Project;
+  includeTable: boolean;
+  onTable: (value: boolean) => void;
+  onTitle: (title: string) => void;
+  onPng: () => void;
+  onCsv: () => void;
+  onClose: () => void;
+  busy: boolean;
 }) {
   return (
     <Panel
@@ -278,6 +324,12 @@ export function AnnotationList({
   onSelect,
   onClear,
   onClose,
+}: {
+  items: Annotation[];
+  selectedId: string | null;
+  onSelect: (item: Annotation) => void;
+  onClear: () => void;
+  onClose: () => void;
 }) {
   return (
     <Panel
@@ -299,11 +351,16 @@ export function AnnotationList({
           </p>
         ) : (
           items.map((item) => {
-            const complete = item.readings?.filter(validReading).length || 0,
-              partial =
-                item.readings?.filter(
-                  (row) => hasReading(row) && !validReading(row),
-                ).length || 0;
+            const complete =
+              item.type === "point"
+                ? item.readings.filter(validReading).length
+                : 0;
+            const partial =
+              item.type === "point"
+                ? item.readings.filter(
+                    (row) => hasReading(row) && !validReading(row),
+                  ).length
+                : 0;
             return (
               <button
                 key={item.id}
@@ -354,10 +411,19 @@ export function AnnotationDetails({
   onUpdate,
   onDelete,
   onClose,
+}: {
+  item: Annotation | undefined;
+  gatewayNames?: string[];
+  open: boolean;
+  onUpdate: (patch: AnnotationPatch) => void;
+  onDelete: () => void;
+  onClose: () => void;
 }) {
-  const text = useRef(null);
-  const readingsTable = useRef(null);
-  const pendingReadingFocus = useRef(null);
+  const text = useRef<HTMLTextAreaElement>(null);
+  const readingsTable = useRef<HTMLTableSectionElement>(null);
+  const pendingReadingFocus = useRef<{ index: number; gateway: string } | null>(
+    null,
+  );
   useEffect(() => {
     if (open && item?.type === "text") {
       text.current?.focus();
@@ -367,24 +433,33 @@ export function AnnotationDetails({
   useEffect(() => {
     if (pendingReadingFocus.current === null) return;
     const { index, gateway } = pendingReadingFocus.current;
-    const input = readingsTable.current?.rows[index]?.querySelector(
+    const input = readingsTable.current?.rows[
+      index
+    ]?.querySelector<HTMLInputElement>(
       gateway ? 'input[type="number"]' : 'input[type="text"]',
     );
     pendingReadingFocus.current = null;
     input?.focus();
-  }, [item?.id, item?.readings?.length]);
+  }, [item?.id, item?.type === "point" ? item.readings.length : 0]);
   function addReading(gateway = "") {
+    if (item?.type !== "point") return;
     if (item.readings.length >= 300) return;
     pendingReadingFocus.current = { index: item.readings.length, gateway };
     onUpdate({ readings: [...item.readings, { ...blankReading(), gateway }] });
   }
-  const updateReading = (index, key, value) =>
+  const updateReading = (index: number, key: keyof Reading, value: string) => {
+    if (item?.type !== "point") return;
     onUpdate({
       readings: item.readings.map((row, i) =>
         i === index ? { ...row, [key]: value } : row,
       ),
     });
-  const position = item?.points?.[0] || [item?.x, item?.y];
+  };
+  const position: Position = item
+    ? "points" in item
+      ? item.points[0]
+      : [item.x, item.y]
+    : [0, 0];
   return (
     <Panel
       id="details-panel"
@@ -532,7 +607,7 @@ export function AnnotationDetails({
                   <tbody id="reading-rows" ref={readingsTable}>
                     {item.readings.map((row, index) => (
                       <tr key={index}>
-                        {["gateway", "rssi", "snr"].map((key) => (
+                        {(["gateway", "rssi", "snr"] as const).map((key) => (
                           <td key={key}>
                             <input
                               type={key === "gateway" ? "text" : "number"}

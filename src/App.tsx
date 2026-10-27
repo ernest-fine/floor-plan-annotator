@@ -1,21 +1,27 @@
+import type { Annotation, AnnotationPatch, PanelName, Tool } from "./types";
 import { useCallback, useEffect, useRef, useState } from "react";
-import MapCanvas from "./components/MapCanvas.jsx";
+import MapCanvas, { type MapCanvasHandle } from "./components/MapCanvas";
 import {
   AnnotationDetails,
   AnnotationList,
   ExportPanel,
   FilesPanel,
   ToolsPanel,
-} from "./components/Panels.jsx";
-import useProject from "./hooks/useProject.js";
-import { projectFromFile, projectFromImage } from "./lib/files.js";
-import { download, exportCsv, exportPng, fileBase } from "./lib/exports.js";
-import { enteredGateways, TOOL_NAMES } from "./lib/model.js";
+} from "./components/Panels";
+import useProject from "./hooks/useProject";
+import { projectFromFile, projectFromImage } from "./lib/files";
+import { download, exportCsv, exportPng, fileBase } from "./lib/exports";
+import { enteredGateways, TOOL_NAMES } from "./lib/model";
 
 export default function App() {
-  const [notice, setNotice] = useState(null);
-  const toastTimer = useRef(null);
-  const notify = useCallback((message, error = false) => {
+  const [notice, setNotice] = useState<{
+    message: string;
+    error: boolean;
+  } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const notify = useCallback((message: string, error = false) => {
     clearTimeout(toastTimer.current);
     setNotice({ message, error });
     toastTimer.current = setTimeout(() => setNotice(null), error ? 8000 : 3000);
@@ -33,28 +39,29 @@ export default function App() {
     undo,
     redo,
   } = useProject(notify);
-  const [panel, setPanel] = useState(null),
+  const [panel, setPanel] = useState<PanelName | null>(null),
     [hidden, setHidden] = useState(false),
-    [selectedId, setSelectedId] = useState(null);
-  const [tool, setTool] = useState("select"),
+    [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tool, setTool] = useState<Tool>("select"),
     [color, setColor] = useState("#d8322a"),
     [size, setSize] = useState(2.6),
     [zoom, setZoom] = useState(1),
     [includeTable, setIncludeTable] = useState(true),
     [busy, setBusy] = useState(false);
-  const map = useRef(null),
-    imageInput = useRef(null),
-    projectInput = useRef(null),
+  const map = useRef<MapCanvasHandle>(null),
+    imageInput = useRef<HTMLInputElement>(null),
+    projectInput = useRef<HTMLInputElement>(null),
     imports = useRef(0);
   const item = project.items.find((item) => item.id === selectedId);
   const close = () => setPanel(null);
-  const toggle = (name) => setPanel((value) => (value === name ? null : name));
-  function chooseTool(value) {
+  const toggle = (name: PanelName) =>
+    setPanel((value) => (value === name ? null : name));
+  function chooseTool(value: Tool) {
     map.current?.cancel();
     setTool(value);
     if (panel !== "tools") close();
   }
-  function historyAction(action) {
+  function historyAction(action: () => void) {
     map.current?.cancel();
     action();
     setSelectedId(null);
@@ -69,7 +76,7 @@ export default function App() {
     setSelectedId(null);
     close();
   }
-  function updateItem(patch) {
+  function updateItem(patch: AnnotationPatch) {
     if (!item) return;
     commit((project) => ({
       ...project,
@@ -78,7 +85,7 @@ export default function App() {
       ),
     }));
   }
-  function addItem(next) {
+  function addItem(next: Annotation) {
     if (project.items.length >= 3000) {
       notify("Annotation limit: 3000.", true);
       return;
@@ -92,7 +99,7 @@ export default function App() {
     setSelectedId(next.id);
     setPanel(next.type === "text" ? "details" : null);
   }
-  async function importFile(file, isProject) {
+  async function importFile(file: File | undefined, isProject: boolean) {
     if (!file || busy) return;
     const request = ++imports.current;
     revision.current++;
@@ -114,7 +121,7 @@ export default function App() {
       setTool("select");
       notify(isProject ? "Project loaded." : "Map loaded.");
     } catch (error) {
-      notify(error.message, true);
+      notify(error instanceof Error ? error.message : String(error), true);
     }
   }
   function saveProject() {
@@ -134,14 +141,17 @@ export default function App() {
       await exportPng(project, includeTable);
       notify("PNG downloaded.");
     } catch (error) {
-      notify(error.message, true);
+      notify(error instanceof Error ? error.message : String(error), true);
     } finally {
       setBusy(false);
     }
   }
   useEffect(() => {
-    function keyDown(event) {
-      if (event.target.closest("input,textarea,select,[contenteditable=true]"))
+    function keyDown(event: KeyboardEvent) {
+      if (
+        event.target instanceof Element &&
+        event.target.closest("input,textarea,select,[contenteditable=true]")
+      )
         return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
         event.preventDefault();
@@ -161,13 +171,14 @@ export default function App() {
         return;
       }
       if (!event.ctrlKey && !event.metaKey && !event.altKey) {
-        const next = {
+        const shortcuts: Partial<Record<string, Tool>> = {
           v: "select",
           d: "point",
           t: "text",
           a: "arrow",
           p: "pen",
-        }[event.key.toLowerCase()];
+        };
+        const next = shortcuts[event.key.toLowerCase()];
         if (next) chooseTool(next);
       }
     }
@@ -176,11 +187,11 @@ export default function App() {
   });
   const chooseImage = () => {
     close();
-    imageInput.current.click();
+    imageInput.current!.click();
   };
   const chooseProject = () => {
     close();
-    projectInput.current.click();
+    projectInput.current!.click();
   };
   return (
     <div
@@ -307,7 +318,7 @@ export default function App() {
           id="zoom-out"
           aria-label="Zoom out"
           disabled={!project.image}
-          onClick={() => map.current.zoomBy(-0.5)}
+          onClick={() => map.current!.zoomBy(-0.5)}
         >
           −
         </button>
@@ -318,14 +329,14 @@ export default function App() {
           id="zoom-in"
           aria-label="Zoom in"
           disabled={!project.image}
-          onClick={() => map.current.zoomBy(0.5)}
+          onClick={() => map.current!.zoomBy(0.5)}
         >
           +
         </button>
         <button
           id="fit"
           disabled={!project.image}
-          onClick={() => map.current.fit()}
+          onClick={() => map.current!.fit()}
         >
           Fit
         </button>
@@ -403,7 +414,7 @@ export default function App() {
         accept="image/jpeg,image/png,.jpg,.jpeg,.png"
         aria-label="Choose floor plan image"
         onChange={(event) => {
-          importFile(event.target.files[0], false);
+          importFile(event.target.files?.[0], false);
           event.target.value = "";
         }}
       />
@@ -414,7 +425,7 @@ export default function App() {
         accept="application/json,.json"
         aria-label="Choose saved project"
         onChange={(event) => {
-          importFile(event.target.files[0], true);
+          importFile(event.target.files?.[0], true);
           event.target.value = "";
         }}
       />

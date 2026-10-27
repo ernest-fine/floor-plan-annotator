@@ -1,7 +1,8 @@
-import { MAX_FILE, MAX_PIXELS, validateProject } from "./model.js";
+import type { LoadedProject } from "../types";
+import { MAX_FILE, MAX_PIXELS, validateProject } from "./model";
 
-export function decodeImage(src) {
-  return new Promise((resolve, reject) => {
+export function decodeImage(src: string): Promise<HTMLImageElement> {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
     image.onerror = () =>
@@ -10,7 +11,7 @@ export function decodeImage(src) {
   });
 }
 
-async function hydrateImage(project) {
+async function hydrateImage(project: LoadedProject): Promise<LoadedProject> {
   const image = await decodeImage(project.image.src);
   if (image.naturalWidth * image.naturalHeight > MAX_PIXELS) {
     throw new Error("Image limit: 24 megapixels.");
@@ -25,11 +26,14 @@ async function hydrateImage(project) {
   };
 }
 
-export async function projectFromImage(file) {
+export async function projectFromImage(file: File): Promise<LoadedProject> {
   if (file.size > MAX_FILE) throw new Error("Image limit: 25 MB.");
-  const src = await new Promise((resolve, reject) => {
+  const src = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
+    reader.onload = () =>
+      typeof reader.result === "string"
+        ? resolve(reader.result)
+        : reject(new Error("File could not be read."));
     reader.onerror = () => reject(new Error("File could not be read."));
     reader.readAsDataURL(file);
   });
@@ -38,15 +42,15 @@ export async function projectFromImage(file) {
   return hydrateImage({
     version: 1,
     title: file.name.replace(/\.[^.]+$/, ""),
-    image: { src, name: file.name },
+    image: { src, name: file.name, width: 1, height: 1 },
     items: [],
     nextNumber: 1,
   });
 }
 
-export async function projectFromFile(file) {
+export async function projectFromFile(file: File): Promise<LoadedProject> {
   if (file.size > 40 * 1024 * 1024) throw new Error("Project limit: 40 MB.");
-  let value;
+  let value: unknown;
   try {
     value = JSON.parse(await file.text());
   } catch {
@@ -55,6 +59,6 @@ export async function projectFromFile(file) {
   return restoreProject(value);
 }
 
-export function restoreProject(value) {
+export function restoreProject(value: unknown): Promise<LoadedProject> {
   return hydrateImage(validateProject(value));
 }

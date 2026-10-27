@@ -1,3 +1,14 @@
+import type { Project, MapImage, Annotation } from "../types";
+interface ReportRow {
+  number: number;
+  color: string;
+  name: string;
+  gateway: string;
+  rssi: string;
+  snr: string;
+  notes: string;
+  state: "Complete" | "Partial" | "Not tested";
+}
 import {
   geometry,
   measure,
@@ -5,10 +16,10 @@ import {
   arrowHead,
   validReading,
   hasReading,
-} from "./model.js";
-import { decodeImage } from "./files.js";
+} from "./model";
+import { decodeImage } from "./files";
 
-export function fileBase(project) {
+export function fileBase(project: Pick<Project, "title" | "image">) {
   return (
     (project.title || project.image?.name || "floor-map")
       .replace(/\.[a-z0-9]+$/i, "")
@@ -16,7 +27,7 @@ export function fileBase(project) {
       .slice(0, 100) || "floor-map"
   );
 }
-export function download(blob, name) {
+export function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob),
     a = document.createElement("a");
   a.href = url;
@@ -26,7 +37,11 @@ export function download(blob, name) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
-export function drawItem(ctx, item, image) {
+export function drawItem(
+  ctx: CanvasRenderingContext2D,
+  item: Annotation,
+  image: MapImage,
+) {
   const { x, y, points } = geometry(item, image),
     m = measure(item, image.width);
   ctx.save();
@@ -45,7 +60,7 @@ export function drawItem(ctx, item, image) {
     ctx.font = `750 ${m * (String(item.number).length > 2 ? 0.64 : 0.9)}px system-ui,sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(item.number, x, y);
+    ctx.fillText(String(item.number), x, y);
   } else if (item.type === "text") {
     ctx.font = `650 ${m}px system-ui,sans-serif`;
     ctx.textBaseline = "alphabetic";
@@ -76,8 +91,8 @@ export function drawItem(ctx, item, image) {
   }
   ctx.restore();
 }
-export function reportRows(project) {
-  const rows = [];
+export function reportRows(project: Project): ReportRow[] {
+  const rows: ReportRow[] = [];
   project.items
     .filter((i) => i.type === "point")
     .forEach((item) => {
@@ -102,8 +117,12 @@ export function reportRows(project) {
     });
   return rows;
 }
-export function wrapCanvas(ctx, value, maxWidth) {
-  const lines = [];
+export function wrapCanvas(
+  ctx: CanvasRenderingContext2D,
+  value: unknown,
+  maxWidth: number,
+) {
+  const lines: string[] = [];
   for (const paragraph of String(value ?? "").split("\n")) {
     let line = "";
     for (const char of paragraph) {
@@ -116,7 +135,11 @@ export function wrapCanvas(ctx, value, maxWidth) {
   }
   return lines;
 }
-export function reportLayout(ctx, width, project) {
+export function reportLayout(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  project: Project,
+) {
   const padding = width * 0.035,
     font = Math.max(12, width * 0.013),
     line = font * 1.45;
@@ -163,7 +186,12 @@ export function reportLayout(ctx, width, project) {
       header + rows.reduce((n, r) => n + r.height, 0) + padding + font * 2,
   };
 }
-export function drawReport(ctx, width, start, layout) {
+export function drawReport(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  start: number,
+  layout: ReturnType<typeof reportLayout>,
+) {
   const { padding, font, line, columns, rows, titleFont, titleLines, header } =
     layout;
   ctx.save();
@@ -226,10 +254,11 @@ export function drawReport(ctx, width, start, layout) {
   );
   ctx.restore();
 }
-export async function exportPng(project, includeTable) {
+export async function exportPng(project: Project, includeTable: boolean) {
   if (!project.image) return;
-  const image = await decodeImage(project.image.src),
-    { width: w, height: h } = project.image;
+  const mapImage = project.image;
+  const image = await decodeImage(mapImage.src),
+    { width: w, height: h } = mapImage;
   const report = includeTable && project.items.some((i) => i.type === "point");
   const canvas = document.createElement("canvas");
   canvas.width = report ? Math.max(1000, w) : w;
@@ -248,15 +277,16 @@ export async function exportPng(project, includeTable) {
     );
   canvas.height = exportHeight;
   ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("This browser could not create the image.");
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.save();
   ctx.scale(canvas.width / w, canvas.width / w);
   ctx.drawImage(image, 0, 0, w, h);
-  project.items.forEach((item) => drawItem(ctx, item, project.image));
+  project.items.forEach((item) => drawItem(ctx!, item, mapImage));
   ctx.restore();
   if (layout) drawReport(ctx, canvas.width, mapHeight, layout);
-  const blob = await new Promise((resolve) =>
+  const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, "image/png"),
   );
   if (!blob)
@@ -264,8 +294,8 @@ export async function exportPng(project, includeTable) {
   download(blob, fileBase(project) + "-annotated.png");
   return { hasTable: !!layout };
 }
-export function exportCsv(project) {
-  const cell = (value) => {
+export function exportCsv(project: Project) {
+  const cell = (value: unknown) => {
     let text = String(value ?? "");
     if (/^[=+\-@\t\r]/.test(text) && !/^[-+]?\d+(\.\d+)?$/.test(text))
       text = "'" + text;

@@ -1,14 +1,19 @@
+import type { Notify, Project, ProjectUpdate, HistoryState } from "../types";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { emptyProject, historyReducer } from "../lib/model.js";
-import { restoreProject } from "../lib/files.js";
-import { readSavedProject, saveProjectLocally } from "../lib/storage.js";
+import { emptyProject, historyReducer, isRecord } from "../lib/model";
+import { restoreProject } from "../lib/files";
+import { readSavedProject, saveProjectLocally } from "../lib/storage";
 
-export default function useProject(notify) {
-  const [state, dispatch] = useReducer(historyReducer, null, () => ({
-    present: emptyProject(),
-    past: [],
-    future: [],
-  }));
+export default function useProject(notify: Notify) {
+  const [state, dispatch] = useReducer(
+    historyReducer,
+    null,
+    (): HistoryState => ({
+      present: emptyProject(),
+      past: [],
+      future: [],
+    }),
+  );
   const current = useRef(state.present),
     revision = useRef(0);
   const [ready, setReady] = useState(false),
@@ -20,7 +25,12 @@ export default function useProject(notify) {
     (async () => {
       try {
         const saved = await readSavedProject();
-        if (saved?.image && active && revision.current === 0) {
+        if (
+          isRecord(saved) &&
+          saved.image &&
+          active &&
+          revision.current === 0
+        ) {
           const restored = await restoreProject(saved);
           if (active && revision.current === 0) {
             current.current = restored;
@@ -79,14 +89,14 @@ export default function useProject(notify) {
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
-  const commit = useCallback((update) => {
+  const commit = useCallback((update: ProjectUpdate) => {
     revision.current++;
     const next =
       typeof update === "function" ? update(current.current) : update;
     current.current = next;
     dispatch({ type: "commit", project: next });
   }, []);
-  const load = useCallback((project) => {
+  const load = useCallback((project: Project) => {
     revision.current++;
     current.current = project;
     dispatch({ type: "load", project });

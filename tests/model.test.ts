@@ -1,3 +1,4 @@
+import type { DrawingAnnotation, HistoryState } from "../src/types";
 import { describe, it, expect } from "vitest";
 import {
   emptyProject,
@@ -7,8 +8,8 @@ import {
   moveItem,
   historyReducer,
   arrowHead,
-} from "../src/lib/model.js";
-import { reportRows, fileBase } from "../src/lib/exports.js";
+} from "../src/lib/model";
+import { reportRows, fileBase } from "../src/lib/exports";
 
 const point = () => createItem("point", [0.2, 0.3], "#d8322a", 2.8, 1);
 const project = () => ({
@@ -31,7 +32,9 @@ describe("project compatibility and readings", () => {
     value.items[0].readings = [{ gateway: "GW A", rssi: "-87", snr: "0" }];
     const result = validateProject(JSON.parse(JSON.stringify(value)));
     expect(result.nextNumber).toBe(2);
-    expect(result.items[0].readings[0].snr).toBe("0");
+    const restoredPoint = result.items[0];
+    if (restoredPoint.type !== "point") throw new Error("Expected a point");
+    expect(restoredPoint.readings[0].snr).toBe("0");
   });
   it("treats zero SNR as recorded and blanks as incomplete", () => {
     expect(validReading({ gateway: "A", rssi: "-87", snr: "0" })).toBe(true);
@@ -75,7 +78,10 @@ describe("annotation geometry and history", () => {
     expect(moveItem(point(), -1, 3)).toMatchObject({ x: 0, y: 1 });
   });
   it("moves all handwriting coordinates together without distorting a stroke", () => {
-    const stroke = {
+    const stroke: DrawingAnnotation = {
+      id: "stroke",
+      color: "#d8322a",
+      size: 2.6,
       type: "pen",
       points: [
         [0.2, 0.3],
@@ -105,7 +111,7 @@ describe("annotation geometry and history", () => {
   });
   it("undoes and redoes without copying image bytes", () => {
     const original = project();
-    let state = { present: original, past: [], future: [] };
+    let state: HistoryState = { present: original, past: [], future: [] };
     state = historyReducer(state, {
       type: "commit",
       project: { ...original, title: "Changed" },
@@ -117,7 +123,7 @@ describe("annotation geometry and history", () => {
     expect(state.present.title).toBe("Changed");
   });
   it("clears redo after a new edit and caps undo memory", () => {
-    let state = { present: project(), past: [], future: [] };
+    let state: HistoryState = { present: project(), past: [], future: [] };
     for (let i = 0; i < 50; i++)
       state = historyReducer(state, {
         type: "commit",
