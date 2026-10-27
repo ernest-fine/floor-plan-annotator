@@ -35,3 +35,9 @@ Images and readings stay on the device. Input limits: 25 MB / 24 megapixels. Sav
 - `tests/`: project compatibility, signal values, history, pin sizing, and pinch gesture regression tests.
 
 GitHub Actions tests, builds, and publishes `dist/` on pushes to `main`. Vite's base path is `/floor-plan-annotator/`.
+
+## Performance profiling
+
+The map owns its zoom and frame-batched gesture updates. Closed panels are unmounted, and autosave writes the image once plus lightweight document snapshots on later edits. Downloaded project files keep their embedded image and version-one format.
+
+[Measurements, reproduction steps, and investigation limits](docs/performance/README.md). Profiling fixtures/probes are local-only build entries and are excluded from the GitHub Pages production build.

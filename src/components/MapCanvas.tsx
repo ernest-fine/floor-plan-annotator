@@ -40,10 +40,17 @@ type Gesture =
       start: Position;
       screen: Position;
       moved: boolean;
+      bounds: DOMRect;
     }
   | { kind: "pan"; screen: Position; scroll: Position }
-  | { kind: "place"; start: Position; screen: Position; tool: "point" | "text" }
-  | { kind: "draw"; screen: Position; moved: boolean };
+  | {
+      kind: "place";
+      start: Position;
+      screen: Position;
+      tool: "point" | "text";
+      bounds: DOMRect;
+    }
+  | { kind: "draw"; screen: Position; moved: boolean; bounds: DOMRect };
 interface Anchor {
   x: number;
   y: number;
@@ -58,6 +65,7 @@ interface Pinch {
 }
 import {
   memo,
+  useMemo,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
@@ -89,7 +97,11 @@ const AnnotationShape = memo(function AnnotationShape({
   selected: boolean;
   draft: boolean;
 }) {
-  const { x, y, points } = geometry(item, image);
+  const { x, y, points } = useMemo(() => geometry(item, image), [item, image]);
+  const polyline = useMemo(
+    () => points.map((point) => point.join(",")).join(" "),
+    [points],
+  );
   const m =
     item.type === "point"
       ? Math.max(
@@ -180,7 +192,6 @@ const AnnotationShape = memo(function AnnotationShape({
       </g>
     );
   }
-  const polyline = points.map((point) => point.join(",")).join(" ");
   return (
     <g {...common}>
       <polyline
@@ -259,6 +270,9 @@ export default function MapCanvas({
     [zoom, setZoom] = useState(1),
     [box, setBox] = useState({ width: 1, height: 1, padding: 24 }),
     [dropping, setDropping] = useState(false);
+  const previewFrame = useRef<number | null>(null);
+  const zoomFrame = useRef<number | null>(null);
+  const pendingZoom = useRef<number | null>(null);
   const image = project.image;
   const fit = image
     ? Math.max(
@@ -269,32 +283,92 @@ export default function MapCanvas({
         ),
       )
     : 1;
-  const width = Math.round(fit * zoom),
+  const width = Math.floor(fit * zoom),
     height = image ? (width * image.height) / image.width : 1;
   const marginTop = Math.max(0, (box.height - box.padding - height) / 2);
 
-  function showPreview(item: Annotation | null) {
-    previewRef.current = item;
-    setPreview(item);
+  function clearPreview() {
+    if (previewFrame.current !== null)
+      cancelAnimationFrame(previewFrame.current);
+    previewFrame.current = null;
+    previewRef.current = null;
+    setPreview(null);
   }
+  function showPreview(item: Annotation | null) {
+    if (!item) {
+      clearPreview();
+      return;
+    }
+    previewRef.current = item;
+    if (previewFrame.current === null)
+      previewFrame.current = requestAnimationFrame(() => {
+        previewFrame.current = null;
+        const next = previewRef.current;
+        setPreview(
+          next && "points" in next
+            ? { ...next, points: next.points.slice() }
+            : next,
+        );
+      });
+  }
+  function cancelInteraction() {
+    gesture.current = null;
+    touches.current.clear();
+    pinch.current = null;
+    suppressTouch.current = false;
+    clearPreview();
+    if (zoomFrame.current !== null) cancelAnimationFrame(zoomFrame.current);
+    zoomFrame.current = null;
+    pendingZoom.current = null;
+    anchor.current = null;
+  }
+  useEffect(() => {
+    const cancel = () => {
+      if (document.visibilityState === "hidden") cancelInteraction();
+    };
+    document.addEventListener("visibilitychange", cancel);
+    return () => {
+      document.removeEventListener("visibilitychange", cancel);
+      if (previewFrame.current !== null)
+        cancelAnimationFrame(previewFrame.current);
+      if (zoomFrame.current !== null) cancelAnimationFrame(zoomFrame.current);
+    };
+  }, []);
   useLayoutEffect(() => {
     const element = viewport.current!;
+    let frame: number | null = null;
     function resize() {
-      setBox({
-        width: element.clientWidth,
-        height: element.clientHeight,
-        padding: parseFloat(getComputedStyle(element).paddingLeft) * 2,
-      });
+      const rect = element.getBoundingClientRect();
+      const next = {
+        width: Math.floor(rect.width),
+        height: Math.floor(rect.height),
+        padding: (parseFloat(getComputedStyle(element).paddingLeft) || 0) * 2,
+      };
+      setBox((previous) =>
+        previous.width === next.width &&
+        previous.height === next.height &&
+        previous.padding === next.padding
+          ? previous
+          : next,
+      );
     }
-    const observer = new ResizeObserver(resize);
-    observer.observe(element);
+    const observer = new ResizeObserver(() => {
+      if (frame === null)
+        frame = requestAnimationFrame(() => {
+          frame = null;
+          resize();
+        });
+    });
+    observer.observe(element, { box: "border-box" });
     resize();
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
   }, []);
   useEffect(() => {
     setZoom(1);
-    showPreview(null);
-    gesture.current = null;
+    cancelInteraction();
     viewport.current!.scrollTo(0, 0);
   }, [image?.src]);
   useEffect(() => {
@@ -318,6 +392,7 @@ export default function MapCanvas({
   useImperativeHandle(ref, () => ({
     zoomBy(delta: number) {
       if (!stage.current!) return;
+      if (gesture.current || pinch.current) cancelInteraction();
       const view = viewport.current!,
         map = stage.current!;
       anchor.current = {
@@ -331,14 +406,12 @@ export default function MapCanvas({
       setZoom((value) => clamp(value + delta, 1, 10));
     },
     fit() {
+      if (gesture.current || pinch.current) cancelInteraction();
       anchor.current = null;
       setZoom(1);
       viewport.current!.scrollTo(0, 0);
     },
-    cancel() {
-      gesture.current = null;
-      showPreview(null);
-    },
+    cancel: cancelInteraction,
     reveal(item: Annotation) {
       if (!stage.current!) return;
       const point: Position =
@@ -357,8 +430,10 @@ export default function MapCanvas({
     },
   }));
 
-  function position(event: { clientX: number; clientY: number }): Position {
-    const rect = overlay.current!.getBoundingClientRect();
+  function position(
+    event: { clientX: number; clientY: number },
+    rect = overlay.current!.getBoundingClientRect(),
+  ): Position {
     return [
       clamp((event.clientX - rect.left) / rect.width),
       clamp((event.clientY - rect.top) / rect.height),
@@ -400,7 +475,7 @@ export default function MapCanvas({
         event.clientY > bounds.bottom)
     )
       return;
-    const point = position(event),
+    const point = position(event, bounds),
       target =
         event.target instanceof Element
           ? event.target.closest<SVGGElement>("[data-id]")
@@ -416,6 +491,7 @@ export default function MapCanvas({
         start: point,
         screen,
         moved: false,
+        bounds,
       };
     } else if (tool === "select") {
       onSelect(null, false);
@@ -425,7 +501,7 @@ export default function MapCanvas({
         scroll: [viewport.current!.scrollLeft, viewport.current!.scrollTop],
       };
     } else if (tool === "point" || tool === "text") {
-      gesture.current = { kind: "place", start: point, screen, tool };
+      gesture.current = { kind: "place", start: point, screen, tool, bounds };
     } else {
       const item: DrawingAnnotation = {
         id: newId(),
@@ -435,7 +511,7 @@ export default function MapCanvas({
         points: tool === "pen" ? [point] : [point, [point[0], point[1]]],
       };
       showPreview(item);
-      gesture.current = { kind: "draw", screen, moved: false };
+      gesture.current = { kind: "draw", screen, moved: false, bounds };
     }
     viewport.current!.setPointerCapture(event.pointerId);
     event.preventDefault();
@@ -452,31 +528,40 @@ export default function MapCanvas({
         screenX: (a[0] + b[0]) / 2 - rect.left,
         screenY: (a[1] + b[1]) / 2 - rect.top,
       };
-      setZoom(
-        clamp(
-          (pinch.current.zoom * Math.hypot(b[0] - a[0], b[1] - a[1])) /
-            Math.max(1, pinch.current.distance),
-          1,
-          10,
-        ),
+      pendingZoom.current = clamp(
+        (pinch.current.zoom * Math.hypot(b[0] - a[0], b[1] - a[1])) /
+          Math.max(1, pinch.current.distance),
+        1,
+        10,
       );
+      if (zoomFrame.current === null)
+        zoomFrame.current = requestAnimationFrame(() => {
+          zoomFrame.current = null;
+          if (pendingZoom.current !== null) {
+            setZoom(pendingZoom.current);
+            pendingZoom.current = null;
+          }
+        });
       event.preventDefault();
       return;
     }
     if (suppressTouch.current) return;
     const current = gesture.current;
     if (!current) return;
-    const point = position(event),
-      distance = Math.hypot(
-        event.clientX - current.screen[0],
-        event.clientY - current.screen[1],
-      );
+    const distance = Math.hypot(
+      event.clientX - current.screen[0],
+      event.clientY - current.screen[1],
+    );
     if (current.kind === "pan") {
       viewport.current!.scrollLeft =
         current.scroll[0] + current.screen[0] - event.clientX;
       viewport.current!.scrollTop =
         current.scroll[1] + current.screen[1] - event.clientY;
-    } else if (current.kind === "move") {
+      return;
+    }
+    if (current.kind === "place") return;
+    const point = position(event, current.bounds);
+    if (current.kind === "move") {
       if (!current.moved && distance < 4) return;
       current.moved = true;
       showPreview(
@@ -494,15 +579,17 @@ export default function MapCanvas({
         showPreview({ ...item, points: [item.points[0], point] });
       else {
         const last = item.points[item.points.length - 1],
-          rect = overlay.current!.getBoundingClientRect();
+          rect = current.bounds;
         if (
           item.points.length < 3000 &&
           Math.hypot(
             (point[0] - last[0]) * rect.width,
             (point[1] - last[1]) * rect.height,
           ) >= 1.5
-        )
-          showPreview({ ...item, points: [...item.points, point] });
+        ) {
+          item.points.push(point);
+          showPreview(item);
+        }
       }
     }
   }

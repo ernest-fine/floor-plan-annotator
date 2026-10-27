@@ -8,6 +8,9 @@ import {
   FilesPanel,
   ToolsPanel,
 } from "./components/Panels";
+import ZoomControls, {
+  type ZoomControlsHandle,
+} from "./components/ZoomControls";
 import useProject from "./hooks/useProject";
 import { projectFromFile, projectFromImage } from "./lib/files";
 import { download, exportCsv, exportPng, fileBase } from "./lib/exports";
@@ -45,13 +48,17 @@ export default function App() {
   const [tool, setTool] = useState<Tool>("select"),
     [color, setColor] = useState("#d8322a"),
     [size, setSize] = useState(2.6),
-    [zoom, setZoom] = useState(1),
     [includeTable, setIncludeTable] = useState(true),
     [busy, setBusy] = useState(false);
   const map = useRef<MapCanvasHandle>(null),
     imageInput = useRef<HTMLInputElement>(null),
     projectInput = useRef<HTMLInputElement>(null),
     imports = useRef(0);
+  const zoomControls = useRef<ZoomControlsHandle>(null);
+  const reportZoom = useCallback(
+    (zoom: number) => zoomControls.current?.setZoom(zoom),
+    [],
+  );
   const item = project.items.find((item) => item.id === selectedId);
   const close = () => setPanel(null);
   const toggle = (name: PanelName) =>
@@ -206,7 +213,7 @@ export default function App() {
         color={color}
         size={size}
         busy={busy}
-        onZoom={setZoom}
+        onZoom={reportZoom}
         onInteract={close}
         onChooseImage={chooseImage}
         onUpload={(file) => importFile(file, false)}
@@ -250,25 +257,29 @@ export default function App() {
           Annotations <span id="mobile-count">{project.items.length}</span>
         </button>
       </div>
-      <FilesPanel
-        project={project}
-        onClose={close}
-        onImage={chooseImage}
-        onOpen={chooseProject}
-        onSave={saveProject}
-        saveStatus={saveStatus}
-        storageError={storageError}
-        busy={busy}
-      />
-      <ToolsPanel
-        tool={tool}
-        onTool={chooseTool}
-        color={color}
-        onColor={setColor}
-        size={size}
-        onSize={setSize}
-        onClose={close}
-      />
+      {panel === "files" && (
+        <FilesPanel
+          project={project}
+          onClose={close}
+          onImage={chooseImage}
+          onOpen={chooseProject}
+          onSave={saveProject}
+          saveStatus={saveStatus}
+          storageError={storageError}
+          busy={busy}
+        />
+      )}
+      {panel === "tools" && (
+        <ToolsPanel
+          tool={tool}
+          onTool={chooseTool}
+          color={color}
+          onColor={setColor}
+          size={size}
+          onSize={setSize}
+          onClose={close}
+        />
+      )}
       <div
         className="history-controls chrome"
         role="group"
@@ -313,34 +324,7 @@ export default function App() {
       >
         Details
       </button>
-      <div className="zoom chrome" role="group" aria-label="Map view">
-        <button
-          id="zoom-out"
-          aria-label="Zoom out"
-          disabled={!project.image}
-          onClick={() => map.current!.zoomBy(-0.5)}
-        >
-          −
-        </button>
-        <output id="zoom-label" aria-label="Zoom level">
-          {Math.round(zoom * 100)}%
-        </output>
-        <button
-          id="zoom-in"
-          aria-label="Zoom in"
-          disabled={!project.image}
-          onClick={() => map.current!.zoomBy(0.5)}
-        >
-          +
-        </button>
-        <button
-          id="fit"
-          disabled={!project.image}
-          onClick={() => map.current!.fit()}
-        >
-          Fit
-        </button>
-      </div>
+      <ZoomControls ref={zoomControls} map={map} disabled={!project.image} />
       <button
         id="hide-controls"
         className="hide-toggle chrome"
@@ -356,46 +340,54 @@ export default function App() {
           Show controls
         </button>
       )}
-      <ExportPanel
-        project={project}
-        includeTable={includeTable}
-        onTable={setIncludeTable}
-        onTitle={(title) => commit((project) => ({ ...project, title }))}
-        onPng={png}
-        onCsv={() => {
-          exportCsv(project);
-          notify("CSV downloaded.");
-        }}
-        onClose={close}
-        busy={busy}
-      />
+      {panel === "export" && (
+        <ExportPanel
+          project={project}
+          includeTable={includeTable}
+          onTable={setIncludeTable}
+          onTitle={(title) => commit((project) => ({ ...project, title }))}
+          onPng={png}
+          onCsv={() => {
+            exportCsv(project);
+            notify("CSV downloaded.");
+          }}
+          onClose={close}
+          busy={busy}
+        />
+      )}
       <aside className="chrome">
-        <AnnotationDetails
-          item={item}
-          gatewayNames={enteredGateways(project.items)}
-          open={panel === "details"}
-          onUpdate={updateItem}
-          onDelete={removeSelected}
-          onClose={close}
-        />
-        <AnnotationList
-          items={project.items}
-          selectedId={selectedId}
-          onSelect={(item) => {
-            setSelectedId(item.id);
-            setPanel("details");
-            map.current?.reveal(item);
-          }}
-          onClear={() => {
-            if (
-              confirm("Clear all annotations and readings? You can undo this.")
-            ) {
-              commit((project) => ({ ...project, items: [], nextNumber: 1 }));
-              setSelectedId(null);
-            }
-          }}
-          onClose={close}
-        />
+        {panel === "details" && (
+          <AnnotationDetails
+            item={item}
+            gatewayNames={enteredGateways(project.items)}
+            open={panel === "details"}
+            onUpdate={updateItem}
+            onDelete={removeSelected}
+            onClose={close}
+          />
+        )}
+        {panel === "list" && (
+          <AnnotationList
+            items={project.items}
+            selectedId={selectedId}
+            onSelect={(item) => {
+              setSelectedId(item.id);
+              setPanel("details");
+              map.current?.reveal(item);
+            }}
+            onClear={() => {
+              if (
+                confirm(
+                  "Clear all annotations and readings? You can undo this.",
+                )
+              ) {
+                commit((project) => ({ ...project, items: [], nextNumber: 1 }));
+                setSelectedId(null);
+              }
+            }}
+            onClose={close}
+          />
+        )}
       </aside>
       <div className="bottom chrome">
         <span

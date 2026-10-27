@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Annotator performance harness</title>
+    <style>
+      body {
+        font: 14px system-ui;
+        margin: 16px;
+        background: #f2f4f1;
+        color: #16281c;
+      }
+      button,
+      select {
+        font: inherit;
+        padding: 10px 14px;
+        margin: 0 8px 12px 0;
+      }
+      main {
+        display: flex;
+        gap: 20px;
+        align-items: start;
+      }
+      iframe {
+        width: 390px;
+        height: 700px;
+        border: 1px solid #aaa;
+        flex-shrink: 0;
+        background: white;
+      }
+      pre {
+        white-space: pre-wrap;
+        max-width: 700px;
+        font-size: 12px;
+      }
+      #status {
+        font-weight: 600;
+        margin: 8px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Local performance profile</h1>
+    <button id="run">Run profile</button
+    ><button id="download" disabled>Download report</button>
+    <div id="status">Ready. Synthetic fixtures only; no user files.</div>
+    <main>
+      <iframe id="phone" title="390px phone viewport"></iframe>
+      <pre id="results"></pre>
+    </main>
+    <script type="module" src="./runner.ts"></script>
+  </body>
+</html>

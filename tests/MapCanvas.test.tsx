@@ -2,7 +2,7 @@ import type { Root } from "react-dom/client";
 import type { Annotation, Tool } from "../src/types";
 import type { MapCanvasHandle } from "../src/components/MapCanvas";
 // @vitest-environment jsdom
-import { act, createRef } from "react";
+import { act, createRef, Profiler } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import MapCanvas from "../src/components/MapCanvas";
@@ -10,6 +10,8 @@ import { createItem } from "../src/lib/model";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let root: Root, host: HTMLDivElement;
+let resizeCallback: (() => void) | undefined;
+let viewportWidth = 400;
 const image = {
   src: "data:image/png;base64,AAAA",
   width: 1200,
@@ -18,7 +20,7 @@ const image = {
 };
 function dimensions(element: Element) {
   if (element.id === "viewport")
-    return { width: 400, height: 800, left: 0, top: 0 };
+    return { width: viewportWidth, height: 800, left: 0, top: 0 };
   const stage = document.getElementById("stage");
   return {
     width: parseFloat(stage?.style.width ?? "") || 376,
@@ -28,12 +30,15 @@ function dimensions(element: Element) {
   };
 }
 beforeEach(() => {
+  viewportWidth = 400;
+  resizeCallback = undefined;
   vi.stubGlobal(
     "ResizeObserver",
     class {
       callback: () => void;
       constructor(callback: () => void) {
         this.callback = callback;
+        resizeCallback = callback;
       }
       observe(_element: Element) {
         this.callback();
@@ -109,24 +114,46 @@ async function setup(tool: Tool = "select", items: Annotation[] = []) {
     onChooseImage: vi.fn(),
     onZoom: vi.fn(),
   };
-  await act(() => root.render(<MapCanvas {...props} />));
-  return props;
-}
-async function pointer(type: string, pointerId: number, x: number, y: number) {
+  const commits = vi.fn();
   await act(() =>
-    document.getElementById("overlay")!.dispatchEvent(
-      new PointerEvent(type, {
-        bubbles: true,
-        cancelable: true,
-        pointerType: "touch",
-        pointerId,
-        isPrimary: pointerId === 1,
-        button: 0,
-        clientX: x,
-        clientY: y,
-      }),
+    root.render(
+      <Profiler id="map" onRender={commits}>
+        <MapCanvas {...props} />
+      </Profiler>,
     ),
   );
+  await frame();
+  return { ...props, commits };
+}
+function dispatchPointer(
+  type: string,
+  pointerId: number,
+  x: number,
+  y: number,
+) {
+  document.getElementById("overlay")!.dispatchEvent(
+    new PointerEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      pointerType: "touch",
+      pointerId,
+      isPrimary: pointerId === 1,
+      button: 0,
+      clientX: x,
+      clientY: y,
+    }),
+  );
+}
+async function frame() {
+  await act(async () => {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve()),
+    );
+  });
+}
+async function pointer(type: string, pointerId: number, x: number, y: number) {
+  await act(() => dispatchPointer(type, pointerId, x, y));
+  await frame();
 }
 
 describe("mobile floor map", () => {
@@ -173,5 +200,72 @@ describe("mobile floor map", () => {
     await pointer("pointerup", 1, 150, 400);
     expect(props.onAdd).toHaveBeenCalledOnce();
     expect(props.onAdd.mock.calls[0][0].type).toBe("point");
+  });
+});
+
+describe("rendering work budgets", () => {
+  it("does not render for repeated identical resize notifications, but responds to real size changes", async () => {
+    const props = await setup();
+    const before = props.commits.mock.calls.length;
+    await act(() => {
+      for (let i = 0; i < 100; i++) resizeCallback?.();
+    });
+    await frame();
+    expect(props.commits.mock.calls.length).toBe(before);
+    viewportWidth = 432;
+    await act(() => resizeCallback?.());
+    await frame();
+    expect(parseFloat(document.getElementById("stage")!.style.width)).toBe(408);
+  });
+  it("batches a burst of pointer events into one preview frame without losing stroke points", async () => {
+    const props = await setup("pen");
+    await pointer("pointerdown", 1, 100, 400);
+    const before = props.commits.mock.calls.length;
+    const queued = new Map<number, FrameRequestCallback>();
+    let nextFrame = 0;
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      queued.set(++nextFrame, callback);
+      return nextFrame;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => queued.delete(id));
+    for (let i = 1; i <= 120; i++) {
+      await act(() => dispatchPointer("pointermove", 1, 100 + i, 400 + Math.sin(i * .1) * 20));
+    }
+    expect(queued.size).toBe(1);
+    await act(() => {
+      const callbacks = [...queued.values()];
+      queued.clear();
+      callbacks.forEach((callback) => callback(0));
+    });
+    expect(props.commits.mock.calls.length - before).toBeLessThanOrEqual(2);
+    await act(() => dispatchPointer("pointerup", 1, 220, 400));
+    const item = props.onAdd.mock.calls[0][0];
+    expect(item.type).toBe("pen");
+    if (!("points" in item)) throw new Error("Expected a stroke");
+    expect(item.points.length).toBeGreaterThan(40);
+  });
+  it("cancels pending drawing when the document is backgrounded", async () => {
+    const props = await setup("pen");
+    await pointer("pointerdown", 1, 100, 400);
+    await act(() => dispatchPointer("pointermove", 1, 180, 420));
+    vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    await act(() => document.dispatchEvent(new Event("visibilitychange")));
+    await frame();
+    await pointer("pointerup", 1, 180, 420);
+    expect(props.onAdd).not.toHaveBeenCalled();
+    expect(document.querySelectorAll("g[data-id]")).toHaveLength(0);
+  });
+});
+
+describe("viewport commands during gestures", () => {
+  it("cancels a stroke before zoom changes its coordinate space", async () => {
+    const props = await setup("pen");
+    await pointer("pointerdown", 1, 100, 400);
+    await pointer("pointermove", 1, 180, 420);
+    await act(() => props.ref.current!.zoomBy(0.5));
+    await frame();
+    await pointer("pointerup", 1, 180, 420);
+    expect(props.onAdd).not.toHaveBeenCalled();
+    expect(props.onZoom).toHaveBeenLastCalledWith(1.5);
   });
 });

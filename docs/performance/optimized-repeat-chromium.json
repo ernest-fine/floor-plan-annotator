@@ -1,0 +1,160 @@
+{
+  "browser": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+  "visibility": "visible",
+  "viewport": "390 × 700 CSS px",
+  "timestamp": "2026-10-27T07:12:42.134Z",
+  "cases": [
+    {
+      "name": "phone screenshot / 6 pins",
+      "imagePixels": 3013524,
+      "imageChars": 253418,
+      "idle": {
+        "counts": {
+          "appRenders": 0,
+          "mapRenders": 0,
+          "listRenders": 0,
+          "resizeCallbacks": 0,
+          "shapeRenders": 0
+        },
+        "writes": [],
+        "longTasks": [],
+        "durationMs": 6001.5,
+        "maxTimerDelayMs": 1.2,
+        "domNodes": 70,
+        "hiddenListRows": 0
+      },
+      "zoom": {
+        "counts": {
+          "appRenders": 0,
+          "mapRenders": 16,
+          "listRenders": 0,
+          "resizeCallbacks": 0,
+          "shapeRenders": 96
+        },
+        "writes": [],
+        "longTasks": [],
+        "steps": 16,
+        "medianPaintMs": 16.1,
+        "maxPaintMs": 19.2
+      },
+      "drawing": {
+        "counts": {
+          "appRenders": 4,
+          "mapRenders": 70,
+          "listRenders": 0,
+          "resizeCallbacks": 0,
+          "shapeRenders": 68
+        },
+        "writes": [
+          {
+            "store": "projects",
+            "imageChars": 0,
+            "syncMs": 0.3,
+            "transactionMs": 1.5
+          }
+        ],
+        "longTasks": [],
+        "pointerMoves": 240,
+        "durationMs": 1834.4
+      },
+      "readingEdit": {
+        "counts": {
+          "appRenders": 5,
+          "mapRenders": 5,
+          "listRenders": 1,
+          "resizeCallbacks": 0,
+          "shapeRenders": 3
+        },
+        "writes": [
+          {
+            "store": "projects",
+            "imageChars": 0,
+            "syncMs": 0.2,
+            "transactionMs": 1.3
+          }
+        ],
+        "longTasks": []
+      },
+      "reload": {
+        "annotationsRestored": 7,
+        "imageRestored": true
+      }
+    },
+    {
+      "name": "large plan / 500 pins + 40 strokes",
+      "imagePixels": 12000000,
+      "imageChars": 718686,
+      "idle": {
+        "counts": {
+          "appRenders": 0,
+          "mapRenders": 0,
+          "listRenders": 0,
+          "resizeCallbacks": 0,
+          "shapeRenders": 0
+        },
+        "writes": [],
+        "longTasks": [],
+        "durationMs": 6001.8,
+        "maxTimerDelayMs": 1.2,
+        "domNodes": 2660,
+        "hiddenListRows": 0
+      },
+      "zoom": {
+        "counts": {
+          "appRenders": 0,
+          "mapRenders": 16,
+          "listRenders": 0,
+          "resizeCallbacks": 0,
+          "shapeRenders": 8640
+        },
+        "writes": [],
+        "longTasks": [],
+        "steps": 16,
+        "medianPaintMs": 16.6,
+        "maxPaintMs": 28.4
+      },
+      "drawing": {
+        "counts": {
+          "appRenders": 4,
+          "mapRenders": 71,
+          "listRenders": 0,
+          "resizeCallbacks": 0,
+          "shapeRenders": 69
+        },
+        "writes": [
+          {
+            "store": "projects",
+            "imageChars": 0,
+            "syncMs": 3.5,
+            "transactionMs": 8.6
+          }
+        ],
+        "longTasks": [],
+        "pointerMoves": 240,
+        "durationMs": 1852.5
+      },
+      "readingEdit": {
+        "counts": {
+          "appRenders": 5,
+          "mapRenders": 5,
+          "listRenders": 1,
+          "resizeCallbacks": 0,
+          "shapeRenders": 3
+        },
+        "writes": [
+          {
+            "store": "projects",
+            "imageChars": 0,
+            "syncMs": 2,
+            "transactionMs": 7.6
+          }
+        ],
+        "longTasks": []
+      },
+      "reload": {
+        "annotationsRestored": 541,
+        "imageRestored": true
+      }
+    }
+  ]
+}
